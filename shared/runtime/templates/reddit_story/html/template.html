@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Preview</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      body {
+        background-color: black;
+      }
+      .title,
+      .name_channel,
+      .mc_elm {
+        font-family: "Anton", sans-serif;
+      }
+      .segment.highlight {
+        background-color: #adb5bd;
+        color: black;
+        padding: 0.1em 0.25em;
+        border-radius: 4px;
+      }
+      .segment {
+        display: block; /* Cho mỗi span xuống dòng */
+        margin-bottom: 0.5em; /* Cách dòng */
+      }
+    </style>
+     <style>
+  #scrolling {
+    position: relative;
+  }
+
+  #scrolling::after {
+    content: "{{channel_name}}"; /* Tên kênh */
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-30deg);
+    font-size: 3rem; /* nhỏ hơn trước */
+    color: rgba(0, 0, 0, 0.1); /* mờ hơn trước */
+    pointer-events: none;
+    white-space: nowrap;
+    z-index: 0;
+  }
+
+  /* Đảm bảo text trong text area hiển thị trên watermark */
+  #scrolling > * {
+    position: relative;
+    z-index: 1;
+  }
+</style>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Anton&family=Roboto:ital,wght@0,100..900;1,100..900&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body class="">
+    <!-- Preview Container (scaled down to 1280x720) -->
+    <div
+      class="relative w-[1280px] h-[720px] overflow-hidden font-sans text-white origin-top-left"
+    >
+      <!-- Nền ảnh -->
+      <img
+        src="{{background_url}}"
+        class="absolute w-full h-full object-cover z-0 brightness-50"
+        alt="background"
+      />
+
+      <!-- Overlay nội dung -->
+      <div class="relative z-10 flex flex-col h-full p-6">
+        <!-- Header -->
+        <div class="flex flex-col items-start mt-4">
+          <div class="title text-4xl flex justify-between items-center w-full overflow-hidden">
+              <span class="truncate max-w-[75%]" title="{{title}}">{{title}}</span>
+              <span class="ml-4 flex-shrink-0">Tập {{number_eps}}</span>
+          </div>
+
+          <div class="text-lg text-gray-300">{{type}}</div>
+        </div>
+
+        <!-- Main content -->
+        <div class="mt-4">
+          <div class="h-[480px] flex flex-1 gap-4">
+            <!-- Text area -->
+            <div
+              id="scrolling"
+              class="max-h-[480px] w-[925px] text-[#111827] bg-[#fefae0] rounded-lg p-4 leading-relaxed shadow-lg space-y-2 border-4 border-white text-4xl overflow-y-auto"
+            >
+              {{LINES}}
+            </div>
+              <!-- MC Video/avatar -->
+            <div class="flex flex-col gap-4 items-center w-[calc(1280px-925px-2rem)]">
+              <div class="flex justify-between gap-4">
+                <img
+                  src="{{channel_avatar_url}}"
+                  alt="Avatar"
+                  class="w-28 h-28 rounded-full object-cover border-4 border-white shadow-lg"
+                />
+                <div class="flex flex-col justify-center">
+                  <span class="name_channel text-xl">{{channel_name}}</span>
+                  <span class="name_a_channel text-sm">{{channel_id}}</span>
+                  <span class="sub_channel text-sm">{{channel_subs}}</span>
+                </div>
+              </div>
+
+              <!-- Khung video -->
+              <div class="relative w-full aspect-[2/3] overflow-hidden shadow-xl border-4 border-white bg-black">
+                <div
+                  class="absolute inset-0 flex justify-center items-center text-white text-2xl"
+                >
+                  MC VIDEO
+                </div>
+                <div
+                  class="mc_elm absolute bottom-0 z-10 bg-red-500 w-full text-center text-xl py-2"
+                >
+                  {{mc_name}}
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="w-full h-[50px] my-4 bg-black bg-opacity-50 text-[24px]"></div>
+        </div>
+      </div>
+    </div>
+    <script>
+      window.__readyToCapture = new Promise((resolve) => {
+        window.__resolveCapture = resolve;
+      });
+
+      function highlight(index) {
+        const segments = document.querySelectorAll(".segment");
+        segments.forEach((el, i) => {
+          const isEmpty = el.textContent.trim() === "";
+          el.classList.toggle("highlight", i === index && !isEmpty);
+        });
+
+        const target = segments[index];
+        if (target) {
+          target.scrollIntoView({
+            behavior: "instant",
+            block: "center",
+          });
+        }
+
+        if (window.__resolveCapture) {
+          requestAnimationFrame(() => {
+            setTimeout(() => {
+              window.__resolveCapture();
+            }, 150);
+          });
+        }
+      }
+    </script>
+  </body>
+</html>

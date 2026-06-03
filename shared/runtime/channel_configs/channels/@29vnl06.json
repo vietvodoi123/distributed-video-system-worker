@@ -1,0 +1,12 @@
+{
+  "channel_id": "@29vnl06",
+
+  "mc": {
+    "name": "Hân",
+    "video_path": "shared/runtime/static_assets/content/mc/mc6.mp4"
+  },
+
+  "scroll_text": {
+    "enabled": true
+  }
+}

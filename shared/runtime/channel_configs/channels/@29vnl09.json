@@ -1,0 +1,12 @@
+{
+  "channel_id": "@29vnl09",
+
+  "mc": {
+    "name": "MC Tiểu Linh",
+    "video_path": "shared/runtime/static_assets/content/mc/mc9.mp4"
+  },
+
+  "scroll_text": {
+    "enabled": true
+  }
+}

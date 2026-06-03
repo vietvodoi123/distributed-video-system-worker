@@ -1,0 +1,14 @@
+DATABASE_URL: "postgresql+asyncpg://admin:admin123@localhost:5432/app_db"
+API_KEY: "AIzaSyDVQO4R5QhwO7tkbwPfBoiWTvMoiiyyk8c"
+
+CLIENT_SECRET_FILE: "config/client_secret.json"
+
+YOUTUBE_TOKEN_DIR: "data/tokens"
+
+MINIO_ENDPOINT: "localhost:9000"
+MINIO_ACCESS_KEY: "admin"
+MINIO_SECRET_KEY: "password123"
+
+TMP_DIR: "tmp"
+
+STATIC_CACHE_DIR: "shared/runtime/static_assets/cache"

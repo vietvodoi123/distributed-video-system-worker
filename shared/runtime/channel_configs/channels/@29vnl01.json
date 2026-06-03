@@ -1,0 +1,12 @@
+{
+  "channel_id": "@29vnl01",
+
+  "mc": {
+    "name": "MC Ốc",
+    "video_path": "shared/runtime/static_assets/content/mc/mc1.mp4"
+  },
+
+  "scroll_text": {
+    "enabled": true
+  }
+}

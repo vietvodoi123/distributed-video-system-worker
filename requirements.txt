@@ -1,0 +1,15 @@
+pydantic
+python-dotenv
+httpx
+playwright
+bs4
+minio
+pydantic_settings
+google-api-python-client
+google-auth
+google-auth-oauthlib
+google-auth-httplib2
+pyyaml
+aiohttp
+pillow
+psutil
