@@ -13,7 +13,9 @@ from shared.runtime.artifacts.artifact_paths import (
 )
 
 from shared.runtime.contexts.batch_runtime_context import (BatchRuntimeContext)
-
+from shared.utils.chapter_title_cleaner import (
+    clean_chapter_title
+)
 class GenerateBatchYoutubeDescriptionExecutor(
     BaseTaskExecutor
 ):
@@ -140,6 +142,15 @@ class GenerateBatchYoutubeDescriptionExecutor(
                     chapter_title_cn
                 )
 
+            chapter_title_vi = clean_chapter_title(
+
+                title=
+                chapter_title_vi,
+
+                chapter_number=
+                chapter["chapter_number"]
+            )
+
             timestamp = (
 
                 f"{current_seconds // 3600:02d}:"
@@ -147,16 +158,15 @@ class GenerateBatchYoutubeDescriptionExecutor(
                 f"{current_seconds % 60:02d}"
             )
 
-            timeline_lines.append(
-
+            line = (
                 f"{timestamp} "
-
-                f"Chương "
-
-                f"{chapter['chapter_number']} - "
-
-                f"{chapter_title_vi}"
+                f"Chương {chapter['chapter_number']}"
             )
+
+            if chapter_title_vi:
+                line += f" - {chapter_title_vi}"
+
+            timeline_lines.append(line)
 
             current_seconds += int(
                 chapter.get(

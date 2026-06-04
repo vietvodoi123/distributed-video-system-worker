@@ -1,4 +1,3 @@
-import hashlib
 import json
 import uuid
 from shared.runtime.static_assets.thumbnail.services.compose_thumbnail import (
@@ -313,15 +312,15 @@ class BatchThumbnailAssetManager:
                 "from storage..."
             )
 
-            temp_path = await (
+            raw_bytes = await (
                 self.artifact_storage
-                .get_local_path(
+                .read_bytes(
                     remote_raw
                 )
             )
 
             raw_path.write_bytes(
-                Path(temp_path).read_bytes()
+                raw_bytes
             )
 
             print(

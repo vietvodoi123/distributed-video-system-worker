@@ -1,5 +1,4 @@
 import hashlib
-import shutil
 
 from pathlib import Path
 
@@ -119,16 +118,15 @@ class McLoopAssetManager(
             "Downloading MC source..."
         )
 
-        temp_path = await (
+        mc_bytes = await (
             self.artifact_storage
-            .get_local_path(
+            .read_bytes(
                 self.mc_path
             )
         )
 
-        shutil.copy(
-            temp_path,
-            local_source
+        local_source.write_bytes(
+            mc_bytes
         )
 
         if not local_source.exists():

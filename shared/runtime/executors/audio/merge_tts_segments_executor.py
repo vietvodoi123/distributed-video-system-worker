@@ -40,7 +40,9 @@ class MergeTtsSegmentsExecutor(
         )
         if not segments:
             raise ValueError(
-                "No TTS segments found"
+                f"No TTS segments found "
+                f"chapter={task.chapter_id} "
+                f"task={task.id}"
             )
         segments.sort(
             key=lambda x:

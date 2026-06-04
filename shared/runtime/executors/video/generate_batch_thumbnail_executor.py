@@ -38,8 +38,10 @@ class GenerateBatchThumbnailExecutor(
 
         started_at = time.time()
 
-        storage = r"C:\Users\HLC\PycharmProjects\distributed-video-system-worker\shared\runtime\fonts\Anton-Regular.ttf"
-
+        storage = (
+            runtime_context
+            .artifact_storage
+        )
         font_path = str(
 
             get_project_root()

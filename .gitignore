@@ -15,7 +15,7 @@ data/tokens/*
 
 # Bỏ qua tất cả thư mục node_modules ở bất kỳ đâu
 **/node_modules/
-**/cache/
+**/static_assets/cache/
 # Bỏ qua thư mục .idea của JetBrains IDE
 .idea/
 
