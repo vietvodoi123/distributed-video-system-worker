@@ -123,18 +123,15 @@ async function renderWorker(
   tasks
 ) {
 
-  const browser =
-    await puppeteer.launch({
-
-      headless: "new",
-
-      args: [
-
-        "--no-sandbox",
-
-        "--disable-setuid-sandbox"
-      ]
-    });
+  const browser = await puppeteer.launch({
+    executablePath:
+      "C:/Program Files/Google/Chrome/Application/chrome.exe",
+    headless: "new",
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox"
+    ]
+});
 
   const page =
     await browser.newPage();
