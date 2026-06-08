@@ -14,7 +14,7 @@ def create_scrolling_text_video(
     font_color="white",
     bg_opacity=0.35,
     output_path="scrolling_text.mp4",
-    font_path=r"C\:/Users/HLC/PycharmProjects/automation_make_video_v2/fonts/Anton-Regular.ttf",
+    font_path=r"C:\Users\MAY1\PycharmProjects\distributed-video-system-worker\shared\runtime\fonts\Anton-Regular.ttf",
     use_gpu=False,
 ):
     """
@@ -24,6 +24,11 @@ def create_scrolling_text_video(
     - Không temp file
     - Ổn định cho video 10h+
     """
+    font_path = (
+        font_path
+        .replace("\\", "/")
+        .replace(":", r"\:")
+    )
 
     if not total_duration:
         raise ValueError("total_duration không hợp lệ")
@@ -90,19 +95,36 @@ def create_scrolling_text_video(
         print("🧠 CPU encode (veryfast)")
 
     cmd.append(output_path)
+    cmd = [str(x) for x in cmd]
 
-    print("▶️ Creating scrolling text video...")
+    print("COMMAND:")
+    print(" ".join(cmd))
 
-    # ⚠️ Không dùng subprocess.run PIPE ở đây
     process = subprocess.Popen(
         cmd,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE
     )
-    process.wait()
+
+    stdout, stderr = process.communicate()
+
+    stdout = stdout.decode(
+        "utf-8",
+        errors="ignore"
+    )
+
+    stderr = stderr.decode(
+        "utf-8",
+        errors="ignore"
+    )
+
+    print("RETURN CODE =", process.returncode)
+    print(stderr)
 
     if process.returncode != 0:
-        raise RuntimeError("FFmpeg failed creating scroll text")
+        raise RuntimeError(
+            f"FFmpeg failed creating scroll text\n\n{stderr}"
+        )
 
     print(f"✅ Scroll video created: {output_path} ({duration}s)")
 

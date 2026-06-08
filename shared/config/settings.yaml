@@ -12,3 +12,10 @@ MINIO_SECRET_KEY: "password123"
 TMP_DIR: "tmp"
 
 STATIC_CACHE_DIR: "shared/runtime/static_assets/cache"
+
+CAPABILITIES:
+  - cpu
+  - network
+  - tts
+  - ffmpeg
+  - puppeteer

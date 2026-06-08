@@ -9,7 +9,6 @@ from shared.runtime.executors.audio.utils.audio_concat import (
     concat_wav_files
 )
 from shared.contracts.artifact_models.timeline_artifact import (
-    TimelineArtifact,
     TimelineSegment
 )
 from shared.runtime.contexts.chapter_runtime_context import (

@@ -12,7 +12,7 @@ class WorkerApiClient:
         )
 
         self.timeout = aiohttp.ClientTimeout(
-            total=60
+            total=300
         )
 
     # =====================================

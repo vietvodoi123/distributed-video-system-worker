@@ -190,7 +190,7 @@ def draw_episode_badge(
 
     font = load_font(
         font_path,
-        int(height * 0.07)
+        int(height * 0.12)
     )
 
     badge_text = (
@@ -211,8 +211,8 @@ def draw_episode_badge(
         bbox[3] - bbox[1]
     )
 
-    padding_x = 35
-    padding_y = 18
+    padding_x = 45
+    padding_y = 25
 
     box_width = (
         text_width
@@ -268,7 +268,7 @@ def draw_episode_badge(
 
         fill=(255, 215, 0),
 
-        stroke_width=3,
+        stroke_width=5,
 
         stroke_fill="black",
     )

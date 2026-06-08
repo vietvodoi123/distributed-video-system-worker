@@ -107,7 +107,7 @@ class TextScrollAssetManager(
                 .MASTER_DURATION_SECONDS
             ),
 
-            use_gpu=True
+            use_gpu=False
         )
 
         return cache_path
