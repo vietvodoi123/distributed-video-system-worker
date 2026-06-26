@@ -9,8 +9,8 @@ from shared.runtime.executors.base.base_task_executor import (
     BaseTaskExecutor
 )
 
-from shared.runtime.executors.translation.services.hachimi_translate_service import (
-    HachimiTranslateService
+from shared.runtime.executors.translation.services.hirashiba_translate_service import (
+    HirashibaTranslateService
 )
 
 from shared.runtime.executors.translation.utils.text_spliter import (
@@ -89,7 +89,7 @@ class TranslateTextExecutor(
         )
 
         translator = (
-            HachimiTranslateService()
+            HirashibaTranslateService()
         )
 
         translated_chunks = []
