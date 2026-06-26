@@ -28,7 +28,7 @@ class HachimiTranslateService:
         translator = HachimiTranslator()
 
         print(
-            translator.load("HachimiMT-30")
+            translator.load("HachimiMT-60")
         )
 
         return translator
