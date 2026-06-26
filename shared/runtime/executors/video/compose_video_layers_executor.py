@@ -183,7 +183,7 @@ class ComposeVideoLayersExecutor(
             output_path=
             str(local_output),
 
-            use_gpu=True
+            use_gpu=False
         )
 
         # =====================================

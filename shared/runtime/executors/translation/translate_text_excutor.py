@@ -9,8 +9,8 @@ from shared.runtime.executors.base.base_task_executor import (
     BaseTaskExecutor
 )
 
-from shared.runtime.executors.translation.services.dichnhanh_translate_service import (
-    DichNhanhTranslateService
+from shared.runtime.executors.translation.services.hachimi_translate_service import (
+    HachimiTranslateService
 )
 
 from shared.runtime.executors.translation.utils.text_spliter import (
@@ -89,7 +89,7 @@ class TranslateTextExecutor(
         )
 
         translator = (
-            DichNhanhTranslateService()
+            HachimiTranslateService()
         )
 
         translated_chunks = []
@@ -134,7 +134,6 @@ class TranslateTextExecutor(
                         f": {e}"
                     )
 
-                    await asyncio.sleep(1)
 
             if not translated:
 
@@ -146,7 +145,6 @@ class TranslateTextExecutor(
                 translated
             )
 
-            await asyncio.sleep(0.3)
 
         merged = (
             ChunkMerger
@@ -180,7 +178,8 @@ class TranslateTextExecutor(
             "executor": (
                 self.__class__.__name__
             ),
-            "translator": "dichnhanh",
+            "translator": "hachimi_local",
+            "model": "HachimiMT-30",
             "chunks": total_chunks,
             "failed_chunks": failed_chunks,
             "max_chars": self.MAX_CHARS,

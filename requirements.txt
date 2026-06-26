@@ -13,3 +13,8 @@ pyyaml
 aiohttp
 pillow
 psutil
+sentencepiece
+huggingface_hub
+ctranslate2
+tokenizers
+transformers

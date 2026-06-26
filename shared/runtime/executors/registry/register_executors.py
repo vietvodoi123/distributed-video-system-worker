@@ -50,6 +50,9 @@ from shared.runtime.executors.video.generate_batch_thumbnail_executor import (
 from shared.runtime.executors.youtube.generate_batch_youtube_upload_executor import (
     GenerateBatchYoutubeUploadExecutor
 )
+from shared.runtime.executors.task_line.generate_task_line_executor import (
+    GenerateLineTaskExecutor
+)
 from shared.contracts.enums.task_types import (
     CRAWL_CHAPTER,
     PREPROCESS_TEXT,
@@ -64,7 +67,7 @@ from shared.contracts.enums.task_types import (
     GENERATE_YOUTUBE_DESCRIPTION,
     MERGE_BATCH_VIDEO,
     GENERATE_BATCH_THUMBNAIL,
-    GENERATE_BATCH_YOUTUBE_UPLOAD
+    GENERATE_BATCH_YOUTUBE_UPLOAD,GENERATE_LINE_TASK
 )
 def register_executors():
 
@@ -127,4 +130,7 @@ def register_executors():
     TaskExecutorRegistry.register(
         GENERATE_BATCH_YOUTUBE_UPLOAD,
         GenerateBatchYoutubeUploadExecutor()
+    )
+    TaskExecutorRegistry.register(
+        GENERATE_LINE_TASK,GenerateLineTaskExecutor()
     )

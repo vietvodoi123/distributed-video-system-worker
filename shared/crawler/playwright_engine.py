@@ -1,5 +1,4 @@
 from typing import Any
-
 from playwright.async_api import async_playwright
 
 from shared.crawler.base_engine import (
@@ -16,7 +15,6 @@ class PlaywrightCrawlerEngine(
         url: str,
         **kwargs
     ) -> str:
-
         async with async_playwright() as p:
 
             browser = await p.chromium.launch(

@@ -58,7 +58,7 @@ class MergeTtsSegmentsExecutor(
 
             output_path = (
                 segment[
-                    "audio_path"
+                    "output_path"
                 ]
             )
 
@@ -177,7 +177,7 @@ class MergeTtsSegmentsExecutor(
 
                     text=
                     segment[
-                        "text"
+                        "line_text"
                     ],
 
                     start_time=
@@ -191,7 +191,7 @@ class MergeTtsSegmentsExecutor(
 
                     audio_path=
                     segment[
-                        "audio_path"
+                        "output_path"
                     ]
                 )
             )

@@ -1,7 +1,7 @@
-GENERATE_TTS_SEGMENTS = "generate_tts_segments"
-
-TTS_LINE = "tts_line"
-
+LINE_TASK = "line_task"
+TTS_LINE="TTS_LINE"
+REFINE_TEXT='REFINE_TEXT'
+GENERATE_TTS_SEGMENTS="GENERATE_TTS_SEGMENTS"
 MERGE_TTS_SEGMENTS = "merge_tts_segments"
 
 CRAWL_CHAPTER = "crawl_chapter"
@@ -10,7 +10,6 @@ PREPROCESS_TEXT="preprocess_text"
 
 TRANSLATE_TEXT="translate_text"
 
-REFINE_TEXT="refine_text"
 
 TEXT_SCROLL_LOOP = "text_scroll_loop"
 
@@ -30,4 +29,6 @@ MERGE_BATCH_VIDEO="merge_batch_videos"
 GENERATE_BATCH_THUMBNAIL="generate_batch_thumbnail"
 
 GENERATE_BATCH_YOUTUBE_UPLOAD="youtube_upload"
+
+GENERATE_LINE_TASK = "generate_line_task"
 

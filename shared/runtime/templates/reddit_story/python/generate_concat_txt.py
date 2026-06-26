@@ -100,7 +100,7 @@ def generate_frames_concat_from_timeline(
 
     for segment in segments:
 
-        index = segment["line_index"]
+        index = int(segment["line_index"])
 
         start_time = (
             segment["start_time"]

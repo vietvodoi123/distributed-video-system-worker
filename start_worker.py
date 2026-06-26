@@ -35,17 +35,13 @@ async def main():
 
 
 if __name__ == "__main__":
-    setup_ffmpeg()
-    subprocess.run(
-        ["ffmpeg", "-version"],
-        capture_output=True
-    )
+    # setup_ffmpeg()
+    # subprocess.run(
+    #     ["ffmpeg", "-version"],
+    #     capture_output=True
+    # )
     ROOT = Path(__file__).parent
 
-    os.environ[
-        "PLAYWRIGHT_BROWSERS_PATH"
-    ] = str(
-        ROOT / "playwright"
-    )
+
 
     asyncio.run(main())
