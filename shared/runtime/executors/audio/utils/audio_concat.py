@@ -4,9 +4,9 @@ from pathlib import Path
 
 
 LOUDNORM_TARGET = {
-    "I": "-16",
+    "I": "-14",
     "LRA": "7",
-    "TP": "-1.5",
+    "TP": "-1.0",
 }
 
 
@@ -120,8 +120,7 @@ async def concat_wav_files(
         f"measured_TP={stats['input_tp']}:"
         f"measured_thresh={stats['input_thresh']}:"
         f"offset={stats['target_offset']}:"
-        "linear=true,"
-        "alimiter=limit=-1.0"
+        "linear=true"
     )
 
     cmd = [
