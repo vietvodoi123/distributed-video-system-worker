@@ -24,6 +24,8 @@ class MinioArtifactStorage(
             secret_key=settings.minio.secret_key,
             secure=settings.minio.secure,
         )
+        print(settings.minio.access_key)
+        print(settings.minio.bucket)
 
     # =====================================
     # EXISTS

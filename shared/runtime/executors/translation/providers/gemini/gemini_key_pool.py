@@ -19,6 +19,7 @@ class GeminiKeyPool:
         api_keys: list[str],
         cooldown_seconds: int,
         network_error_cooldown_seconds: int = 10,
+        min_request_interval_seconds: float = 1.0,
     ):
 
         if not api_keys:
@@ -45,7 +46,9 @@ class GeminiKeyPool:
         self._condition = asyncio.Condition(self._lock)
 
         self._current_index = 0
-
+        self._min_request_interval_seconds = (
+            min_request_interval_seconds
+        )
         logger.info(
             "[GeminiKeyPool] Loaded %d API keys.",
             len(self._keys),
@@ -68,6 +71,8 @@ class GeminiKeyPool:
                             now,
                     ):
                         key.state = ApiKeyState.BUSY
+
+                        key.last_request_at = now
 
                         return key
 
@@ -154,8 +159,8 @@ class GeminiKeyPool:
 
         return key
 
-    @staticmethod
     def _is_available(
+            self,
             key: GeminiApiKey,
             now: datetime,
     ) -> bool:
@@ -166,19 +171,30 @@ class GeminiKeyPool:
         if key.state == ApiKeyState.BUSY:
             return False
 
-        if key.state == ApiKeyState.FREE:
-            return True
+        if key.state == ApiKeyState.COOLDOWN:
 
-        if key.state != ApiKeyState.COOLDOWN:
-            return False
+            if key.cooldown_until is None:
+                return False
 
-        if key.cooldown_until is None:
-            return False
+            if key.cooldown_until > now:
+                return False
 
-        if key.cooldown_until <= now:
             key.state = ApiKeyState.FREE
             key.cooldown_until = None
-            return True
+
+        if key.state == ApiKeyState.FREE:
+
+            if key.last_request_at is None:
+                return True
+
+            elapsed = (
+                    now - key.last_request_at
+            ).total_seconds()
+
+            return (
+                    elapsed
+                    >= self._min_request_interval_seconds
+            )
 
         return False
 
@@ -199,25 +215,49 @@ class GeminiKeyPool:
             now: datetime,
     ) -> float | None:
 
-        cooldowns = [
+        wait_times = []
 
-            (
-                    key.cooldown_until - now
-            ).total_seconds()
+        for key in self._keys:
 
-            for key in self._keys
-
+            # Đang cooldown
             if (
                     key.state == ApiKeyState.COOLDOWN
                     and key.cooldown_until is not None
-            )
+            ):
+                wait_times.append(
+                    max(
+                        (
+                                key.cooldown_until - now
+                        ).total_seconds(),
+                        0.1,
+                    )
+                )
+                continue
 
-        ]
+            # FREE nhưng đang rate limit
+            if (
+                    key.state == ApiKeyState.FREE
+                    and key.last_request_at is not None
+            ):
 
-        if cooldowns:
-            return max(
-                min(cooldowns),
-                0.1,
-            )
+                elapsed = (
+                        now - key.last_request_at
+                ).total_seconds()
+
+                remaining = (
+                        self._min_request_interval_seconds
+                        - elapsed
+                )
+
+                if remaining > 0:
+                    wait_times.append(
+                        max(
+                            remaining,
+                            0.1,
+                        )
+                    )
+
+        if wait_times:
+            return min(wait_times)
 
         return None

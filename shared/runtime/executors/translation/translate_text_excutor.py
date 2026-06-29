@@ -150,20 +150,13 @@ class TranslateTextExecutor(
 
                 print("!" * 120 + "\n")
 
-
-
             if translated is None:
                 failed_chunks += 1
 
-                print(
-                    f"[Translate] Chunk {chunk_id} FAILED."
+                raise RuntimeError(
+                    f"Translation failed at chunk "
+                    f"{chunk_id}/{total_chunks}."
                 )
-
-                print(
-                    "[Translate] Falling back to original text."
-                )
-
-                translated = chunk
 
             translated_chunks.append(translated)
 

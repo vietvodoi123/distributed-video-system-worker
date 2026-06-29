@@ -12,12 +12,16 @@ class ApiKeyState(str, Enum):
 
 @dataclass(slots=True)
 class GeminiApiKey:
+
     id: int
+
     api_key: str
 
     state: ApiKeyState = ApiKeyState.FREE
 
     cooldown_until: datetime | None = None
+
+    last_request_at: datetime | None = None
 
     consecutive_errors: int = 0
 
