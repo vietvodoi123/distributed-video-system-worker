@@ -128,7 +128,9 @@ class YouTubeAPI:
             url,
             params=params
         )
-
+        # print(response.url)
+        # print(response.status_code)
+        # print(response.text)
         response.raise_for_status()
 
         data = response.json()

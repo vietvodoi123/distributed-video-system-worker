@@ -14,11 +14,7 @@ class HirashibaTranslateService:
     _device = None
     _lock = asyncio.Lock()
 
-    MODEL_PATH = (
-        Path(__file__).resolve().parents[5]
-        / "models"
-        / "hirashiba-mt-tiny-zh-vi"
-    )
+    MODEL_PATH = r"C:\Users\HLC\PycharmProjects\distributed-video-system-worker\shared\runtime\executors\translation\models\hirashiba-mt-tiny-zh-vi"
 
     @classmethod
     async def _load(cls):
@@ -94,3 +90,17 @@ class HirashibaTranslateService:
             )
 
         return "\n".join(translated_lines)
+
+# import asyncio
+#
+# async def main():
+#     translator = HirashibaTranslateService()
+#
+#     text = "你好"
+#
+#     translated = await translator.translate(text)
+#
+#     print(translated)
+#
+# if __name__ == "__main__":
+#     asyncio.run(main())

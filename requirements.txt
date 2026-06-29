@@ -19,3 +19,6 @@ ctranslate2
 tokenizers
 transformers
 torch
+sacremoses
+openai
+google-genai

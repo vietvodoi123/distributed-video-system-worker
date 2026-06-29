@@ -8,7 +8,7 @@ class WorkerApiClient:
     def __init__(self):
 
         self.base_url = (
-            settings.API_BASE_URL.rstrip("/")
+            settings.api.base_url.rstrip("/")
         )
 
         self.timeout = aiohttp.ClientTimeout(

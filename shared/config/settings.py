@@ -1,41 +1,76 @@
-from pydantic_settings import BaseSettings
+from pathlib import Path
+
+import yaml
+from pydantic import BaseModel
 
 
-class Settings(BaseSettings):
+class MinioSettings(BaseModel):
+    endpoint: str
+    access_key: str
+    secret_key: str
+    bucket: str
+    secure: bool
 
-    # =====================================
-    # MINIO
-    # =====================================
 
-    MINIO_ENDPOINT: str = "100.114.159.127:9000"
+class WorkerSettings(BaseModel):
+    poll_interval: int
+    task_lease_seconds: int
 
-    MINIO_ACCESS_KEY: str = "admin"
 
-    MINIO_SECRET_KEY: str = "password123"
+class ApiSettings(BaseModel):
+    base_url: str
 
-    MINIO_BUCKET: str = "tts-system"
 
-    MINIO_SECURE: bool = False
+class RunwareSettings(BaseModel):
+    api_key: str
+    model: str
 
-    # =====================================
-    # WORKER
-    # =====================================
 
-    WORKER_POLL_INTERVAL: int = 5
+class GeminiSettings(BaseModel):
+    model: str
+    api_keys: list[str]
+    timeout: int
+    cooldown_seconds: int
+    max_retry: int
 
-    TASK_LEASE_SECONDS: int = 30
 
-    # =====================================
-    # API
-    # =====================================
+class LLMSettings(BaseModel):
+    gemini: GeminiSettings
 
-    API_BASE_URL: str = "http://100.114.159.127:8000"
+class YoutubeSettings(BaseModel):
+    client_secret_file: str
+    token_dir:str
+    api_key: str
 
-    class Config:
+class FontSetting(BaseModel):
+    font_path: str
 
-        env_file = ".env"
-    RUNWARE_API_KEY: str="CWIphkGEitqkHYtJBqoUJGvHxRGnZppO"
+class OpenAiSetting(BaseModel):
+    open_ai_api_key: str
 
-    RUNWARE_IMAGE_MODEL: str = "openai:gpt-image@2"
+class TranslationSetting(BaseModel):
+    chunk_max_chars: int
 
-settings = Settings()
+class Settings(BaseModel):
+    minio: MinioSettings
+    worker: WorkerSettings
+    api: ApiSettings
+    runware: RunwareSettings
+    llm: LLMSettings
+    youtube: YoutubeSettings
+    font: FontSetting
+    open_ai: OpenAiSetting
+    capabilities: list[str]
+    translation: TranslationSetting
+
+    @classmethod
+    def load(cls, path: str | Path):
+        with open(path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+
+        return cls.model_validate(data)
+
+
+settings = Settings.load(
+    Path(__file__).with_name("settings.yaml")
+)

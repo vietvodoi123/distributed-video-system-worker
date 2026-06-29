@@ -43,7 +43,7 @@ class BaseWorker(ABC):
 
     capabilities: list[str] = []
 
-    poll_interval: int = settings.WORKER_POLL_INTERVAL
+    poll_interval: int = settings.worker.poll_interval
 
     max_batch_size: int = 1
 

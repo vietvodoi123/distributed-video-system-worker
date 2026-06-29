@@ -1,10 +1,8 @@
 import time
 
 from datetime import datetime
+from shared.config.settings import settings
 
-from shared.config.settings import (
-    settings
-)
 from shared.runtime.artifacts.artifact_paths import (
     get_project_root
 )
@@ -43,12 +41,10 @@ class GenerateBatchThumbnailExecutor(
             .artifact_storage
         )
         font_path = str(
-
             get_project_root()
-            / "runtime"
-            / "fonts"
-            / "Anton-Regular.ttf"
+            / settings.font.font_path
         )
+
         # =================================
         # STORY
         # =================================
@@ -164,7 +160,7 @@ class GenerateBatchThumbnailExecutor(
                 storage,
 
                 runware_api_key=
-                settings.RUNWARE_API_KEY,
+                settings.runware.api_key,
 
                 font_path=
                 font_path,
@@ -173,7 +169,7 @@ class GenerateBatchThumbnailExecutor(
                 episode_text,
                 story_id=story_id,
                 model=
-                settings.RUNWARE_IMAGE_MODEL,
+                settings.runware.model,
             )
         )
 

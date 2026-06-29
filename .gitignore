@@ -12,6 +12,8 @@ output/
 logs/
 data/thumbnail/*
 data/tokens/*
+shared/config/settings.yaml
+shared/config/settings.local.yaml
 
 # Bỏ qua tất cả thư mục node_modules ở bất kỳ đâu
 **/node_modules/

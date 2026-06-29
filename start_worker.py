@@ -2,7 +2,7 @@ import asyncio
 import subprocess
 import os
 from pathlib import Path
-
+from shared.config.settings import settings
 
 from shared.runtime.workers.base_worker import (
     BaseWorker
@@ -21,10 +21,7 @@ class Worker(BaseWorker):
 
         super().__init__()
 
-        self.capabilities = cfg.get(
-            "CAPABILITIES",
-            []
-        )
+        self.capabilities = settings.capabilities
 
 
 async def main():

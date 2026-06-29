@@ -1,16 +1,15 @@
 # shared/runtime/executors/translation/refine_text_executor.py
 
-import asyncio
+import traceback
 import time
-
 from datetime import datetime
-
+from shared.config.settings import settings
 from shared.runtime.executors.base.base_task_executor import (
     BaseTaskExecutor
 )
 
-from shared.runtime.executors.translation.services.hirashiba_translate_service import (
-    HirashibaTranslateService
+from shared.runtime.executors.translation.providers.gemini.gemini_provider import (
+    gemini_translate_service,
 )
 
 from shared.runtime.executors.translation.utils.text_spliter import (
@@ -31,10 +30,11 @@ from shared.runtime.contexts.chapter_runtime_context import (
 class TranslateTextExecutor(
     BaseTaskExecutor
 ):
+    MAX_CHARS = (
+        settings.translation.chunk_max_chars
+    )
 
-    MAX_CHARS = 8000
-
-    RETRY_COUNT = 3
+    # RETRY_COUNT = 3
 
     async def execute(
         self,
@@ -88,9 +88,6 @@ class TranslateTextExecutor(
             )
         )
 
-        translator = (
-            HirashibaTranslateService()
-        )
 
         translated_chunks = []
 
@@ -102,48 +99,73 @@ class TranslateTextExecutor(
 
         for index, chunk in enumerate(chunks):
 
-            print(
-                "[TranslateTextExecutor] "
-                f"Translating chunk "
-                f"{index + 1}/{total_chunks}"
-            )
+            chunk_id = index + 1
+
+            print("\n" + "=" * 120)
+            print(f"[Translate] Chunk {chunk_id}/{total_chunks}")
+            print(f"Length : {len(chunk)} chars")
+            print("=" * 120)
 
             translated = None
 
-            for attempt in range(
-                1,
-                self.RETRY_COUNT + 1
-            ):
 
-                try:
+            started = time.perf_counter()
 
-                    translated = (
-                        await translator.translate(
-                            chunk
-                        )
-                    )
+            print(
+                f"\n[Translate] "
+                f"Chunk {chunk_id}/{total_chunks}"
+            )
 
-                    break
+            try:
 
-                except Exception as e:
+                print("[Translate] Calling Gemini...")
 
-                    print(
-                        "[TranslateTextExecutor] "
-                        f"Chunk failed "
-                        f"(attempt {attempt}) "
-                        f": {e}"
-                    )
+                translated = await gemini_translate_service.translate(
+                    chunk,
+                )
+
+                elapsed = time.perf_counter() - started
+
+                print(
+                    f"[Translate] SUCCESS "
+                    f"({elapsed:.2f}s)"
+                )
 
 
-            if not translated:
+            except Exception as e:
 
+                elapsed = time.perf_counter() - started
+
+                print("\n" + "!" * 120)
+                print(
+                    f"[Translate] FAILED "
+                    f"Chunk {chunk_id}/{total_chunks}"
+                )
+                print(f"Elapsed : {elapsed:.2f}s")
+                print(f"Type    : {type(e).__name__}")
+                print(f"Message : {e}")
+                print("-" * 120)
+
+                traceback.print_exc()
+
+                print("!" * 120 + "\n")
+
+
+
+            if translated is None:
                 failed_chunks += 1
+
+                print(
+                    f"[Translate] Chunk {chunk_id} FAILED."
+                )
+
+                print(
+                    "[Translate] Falling back to original text."
+                )
 
                 translated = chunk
 
-            translated_chunks.append(
-                translated
-            )
+            translated_chunks.append(translated)
 
 
         merged = (
@@ -178,8 +200,8 @@ class TranslateTextExecutor(
             "executor": (
                 self.__class__.__name__
             ),
-            "translator": "hachimi_local",
-            "model": "HachimiMT-30",
+            "translator": "gemini",
+            "model": settings.llm.gemini.model,
             "chunks": total_chunks,
             "failed_chunks": failed_chunks,
             "max_chars": self.MAX_CHARS,

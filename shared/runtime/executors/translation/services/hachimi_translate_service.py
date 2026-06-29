@@ -33,16 +33,48 @@ class HachimiTranslateService:
 
         return translator
 
-    async def translate(self, text: str) -> str:
+    async def translate(
+            self,
+            text: str,
+    ) -> str:
         loop = asyncio.get_running_loop()
 
-        _, result = await loop.run_in_executor(
+        def _translate():
+            translated_lines = []
+
+            for line in text.split("\n"):
+                line = line.strip()
+
+                if not line:
+                    translated_lines.append("")
+                    continue
+
+                _, translated = self._translator.translate_text(
+                    line,
+                    chunk_mode="sentence",
+                    beam_size=1,
+                )
+
+                translated_lines.append(translated)
+
+            return "\n".join(translated_lines)
+
+        return await loop.run_in_executor(
             None,
-            lambda: self._translator.translate_text(
-                text,
-                chunk_mode="sentence",
-                beam_size=1,
-            )
+            _translate,
         )
 
-        return result
+
+import asyncio
+
+async def main():
+    translator = HachimiTranslateService()
+
+    text = "你好"
+
+    translated = await translator.translate(text)
+
+    print(translated)
+
+if __name__ == "__main__":
+    asyncio.run(main())
