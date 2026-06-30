@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from shared.runtime.executors.translation.models.api_key import (
     GeminiApiKey,ApiKeyState
 )
-
+from shared.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -49,10 +49,21 @@ class GeminiKeyPool:
         self._min_request_interval_seconds = (
             min_request_interval_seconds
         )
+        self._request_semaphore = asyncio.Semaphore(
+            settings.llm.gemini.max_concurrent_requests,
+        )
         logger.info(
             "[GeminiKeyPool] Loaded %d API keys.",
             len(self._keys),
         )
+
+    async def enter_request(self) -> None:
+
+        await self._request_semaphore.acquire()
+
+    def leave_request(self) -> None:
+
+        self._request_semaphore.release()
 
     async def acquire(self) -> GeminiApiKey:
 
@@ -261,3 +272,14 @@ class GeminiKeyPool:
             return min(wait_times)
 
         return None
+
+    async def release(
+            self,
+            key: GeminiApiKey,
+    ):
+
+        async with self._condition:
+            if key.state == ApiKeyState.BUSY:
+                key.state = ApiKeyState.FREE
+
+            self._condition.notify()

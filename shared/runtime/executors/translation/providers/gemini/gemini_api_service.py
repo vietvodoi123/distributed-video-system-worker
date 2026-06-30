@@ -1,7 +1,5 @@
 import asyncio
 import logging
-import traceback
-logger = logging.getLogger(__name__)
 
 from google.genai import types
 
@@ -14,10 +12,15 @@ from shared.runtime.executors.translation.models.gemini_response import (
 from shared.runtime.executors.translation.providers.gemini.gemini_client_factory import (
     GeminiClientFactory,
 )
+from shared.runtime.executors.translation.providers.gemini.gemini_exception_mapper import (
+    GeminiExceptionMapper,
+)
 from shared.runtime.executors.translation.providers.gemini.gemini_key_pool import (
     GeminiKeyPool,
 )
-from shared.runtime.executors.translation.providers.gemini.gemini_exception_mapper import GeminiExceptionMapper
+
+logger = logging.getLogger(__name__)
+
 
 class GeminiApiService:
 
@@ -32,7 +35,6 @@ class GeminiApiService:
         self._client_factory = client_factory
         self._model = model
 
-
     async def generate(
         self,
         request: GeminiRequest,
@@ -40,13 +42,17 @@ class GeminiApiService:
 
         while True:
 
-            key = await self._key_pool.acquire()
+            await self._key_pool.enter_request()
 
-            client = self._client_factory.create(
-                key.api_key,
-            )
+            key = None
 
             try:
+
+                key = await self._key_pool.acquire()
+
+                client = self._client_factory.create(
+                    key.api_key,
+                )
 
                 config = types.GenerateContentConfig(
                     temperature=request.temperature,
@@ -74,11 +80,11 @@ class GeminiApiService:
 
                 return GeminiResponse(
                     text=response.text,
-                    finish_reason=str(
-                        response.candidates[0].finish_reason
-                    )
-                    if response.candidates
-                    else None,
+                    finish_reason=(
+                        str(response.candidates[0].finish_reason)
+                        if response.candidates
+                        else None
+                    ),
                     prompt_token_count=getattr(
                         usage,
                         "prompt_token_count",
@@ -96,39 +102,50 @@ class GeminiApiService:
                     ),
                 )
 
-
             except Exception as ex:
 
+                if key is None:
+                    raise
+
                 if GeminiExceptionMapper.is_permission_error(ex):
+
                     logger.error(
                         "[GeminiApiService] %s PERMISSION ERROR: %s",
                         key.display_name,
                         ex,
                     )
 
-                    await self._key_pool.disable(key)
+                    await self._key_pool.disable(
+                        key,
+                    )
 
                     continue
 
                 if GeminiExceptionMapper.is_quota_error(ex):
+
                     logger.warning(
                         "[GeminiApiService] %s QUOTA ERROR: %s",
                         key.display_name,
                         ex,
                     )
 
-                    await self._key_pool.report_quota_error(key)
+                    await self._key_pool.report_quota_error(
+                        key,
+                    )
 
                     continue
 
                 if GeminiExceptionMapper.is_network_error(ex):
+
                     logger.warning(
                         "[GeminiApiService] %s NETWORK ERROR: %s",
                         key.display_name,
                         ex,
                     )
 
-                    await self._key_pool.report_error(key)
+                    await self._key_pool.report_error(
+                        key,
+                    )
 
                     continue
 
@@ -137,5 +154,12 @@ class GeminiApiService:
                     key.display_name,
                 )
 
+                await self._key_pool.release(
+                    key,
+                )
+
                 raise
 
+            finally:
+
+                self._key_pool.leave_request()

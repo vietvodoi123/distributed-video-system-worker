@@ -228,7 +228,8 @@ class TranslationPostProcessor:
             source: str,
             target: str,
     ) -> bool:
-
+        # print(source)
+        # print(target)
         if len(source) < 50:
             return False
 

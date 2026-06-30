@@ -32,6 +32,7 @@ class GeminiSettings(BaseModel):
     timeout: int
     cooldown_seconds: int
     max_retry: int
+    max_concurrent_requests: int
 
 
 class LLMSettings(BaseModel):

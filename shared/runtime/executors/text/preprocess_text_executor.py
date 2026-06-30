@@ -7,6 +7,9 @@ from shared.runtime.executors.base.base_task_executor import (
 from shared.text.cleaners.cn_cleaner import (
     clean_cn_content
 )
+from shared.text.cleaners.cn_validator import (
+    validate_chapter_text
+)
 from shared.runtime.contexts.chapter_runtime_context import (
     ChapterRuntimeContext
 )
@@ -50,6 +53,11 @@ class PreprocessTextExecutor(
             raise ValueError(
                 "raw text is empty"
             )
+        # =====================================
+        # validate
+        # =====================================
+
+        validate_chapter_text(raw_text)
 
         # =====================================
         # CLEAN
