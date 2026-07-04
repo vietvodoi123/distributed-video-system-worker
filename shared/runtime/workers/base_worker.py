@@ -440,10 +440,16 @@ class BaseWorker(ABC):
 
             runtime_context = (
                 await create_runtime_context(
+
                     task=task,
+
                     worker_id=self.worker_id,
+
                     workspace_dir=workspace_dir,
+
                     artifact_storage=self.artifact_storage,
+
+                    api_client=self.api
                 )
             )
             # ==================================

@@ -15,9 +15,32 @@ class WorkerApiClient:
             total=300
         )
 
+
     # =====================================
     # INTERNAL
     # =====================================
+
+    async def _get(
+        self,
+        endpoint: str
+    ):
+
+        url = (
+            f"{self.base_url}{endpoint}"
+        )
+
+        async with aiohttp.ClientSession(
+            timeout=self.timeout
+        ) as session:
+
+            async with session.get(
+                url
+            ) as response:
+
+                response.raise_for_status()
+
+                return await response.json()
+
 
     async def _post(
         self,
@@ -42,6 +65,61 @@ class WorkerApiClient:
 
                 return await response.json()
 
+
+    async def _patch(
+        self,
+        endpoint: str,
+        payload: dict
+    ):
+
+        url = (
+            f"{self.base_url}{endpoint}"
+        )
+
+        async with aiohttp.ClientSession(
+            timeout=self.timeout
+        ) as session:
+
+            async with session.patch(
+                url,
+                json=payload
+            ) as response:
+
+                response.raise_for_status()
+
+                return await response.json()
+
+
+    # =====================================
+    # CHAPTER DATA
+    # =====================================
+
+    async def get_chapter_text(
+        self,
+        chapter_id: str
+    ):
+
+        return await self._get(
+
+            f"/chapters/{chapter_id}/text"
+        )
+
+
+    async def update_chapter_text(
+        self,
+        *,
+        chapter_id: str,
+        data: dict
+    ):
+
+        return await self._patch(
+
+            f"/chapters/{chapter_id}/text",
+
+            data
+        )
+
+
     # =====================================
     # CLAIM TASKS
     # =====================================
@@ -61,25 +139,25 @@ class WorkerApiClient:
         payload = {
 
             "worker_id":
-                worker_id,
+            worker_id,
 
             "worker_type":
-                worker_type,
+            worker_type,
 
             "capabilities":
-                capabilities,
+            capabilities,
 
             "available_capacity_cost":
-                available_capacity_cost,
+            available_capacity_cost,
 
             "current_reserved_cost":
-                current_reserved_cost,
+            current_reserved_cost,
 
             "max_batch_size":
-                max_batch_size,
+            max_batch_size,
 
             "resource_capacity":
-                resource_capacity
+            resource_capacity
         }
 
         return await self._post(
@@ -89,39 +167,39 @@ class WorkerApiClient:
             payload
         )
 
+
     # =====================================
     # COMPLETE TASK
     # =====================================
 
     async def complete_task(
-            self,
-            *,
-            worker_id: str,
-            task_id: str,
-            execution_result: dict,
+        self,
+        *,
+        worker_id: str,
+        task_id: str,
+        execution_result: dict,
     ):
+
         payload = {
 
             "worker_id":
-                worker_id,
+            worker_id,
 
             "task_id":
-                str(task_id),
+            str(task_id),
 
             "result":
-                execution_result
+            execution_result
         }
 
 
-
-        response = await self._post(
+        return await self._post(
 
             "/workers/complete-task",
 
             payload
         )
 
-        return response
 
     # =====================================
     # FAIL TASK
@@ -138,14 +216,15 @@ class WorkerApiClient:
         payload = {
 
             "worker_id":
-                worker_id,
+            worker_id,
 
             "task_id":
-                str(task_id),
+            str(task_id),
 
             "error_message":
-                error_message
+            error_message
         }
+
 
         return await self._post(
 
@@ -153,6 +232,7 @@ class WorkerApiClient:
 
             payload
         )
+
 
     # =====================================
     # RENEW LEASES
@@ -169,14 +249,18 @@ class WorkerApiClient:
         payload = {
 
             "worker_id":
-                worker_id,
+            worker_id,
 
             "task_ids":
-                [str(x) for x in task_ids],
+            [
+                str(x)
+                for x in task_ids
+            ],
 
             "lease_seconds":
-                lease_seconds
+            lease_seconds
         }
+
 
         return await self._post(
 
@@ -184,6 +268,7 @@ class WorkerApiClient:
 
             payload
         )
+
 
     # =====================================
     # WORKER STATE
@@ -201,17 +286,18 @@ class WorkerApiClient:
         payload = {
 
             "worker_id":
-                worker_id,
+            worker_id,
 
             "active_tasks":
-                active_tasks,
+            active_tasks,
 
             "queued_tasks":
-                queued_tasks,
+            queued_tasks,
 
             "metadata":
-                metadata or {}
+            metadata or {}
         }
+
 
         return await self._post(
 

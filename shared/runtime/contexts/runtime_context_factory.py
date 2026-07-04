@@ -12,6 +12,7 @@ async def create_runtime_context(
     worker_id,
     workspace_dir,
     artifact_storage,
+    api_client=None,
 ):
     # =====================================
     # CHAPTER TASK
@@ -35,6 +36,8 @@ async def create_runtime_context(
                 chapter_id=str(task.chapter_id),
 
                 chapter_number=task.chapter_number,
+
+                api_client=api_client
             )
         )
 

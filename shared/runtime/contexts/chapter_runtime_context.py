@@ -31,20 +31,23 @@ class ChapterRuntimeContext(
 ):
 
     def __init__(
-        self,
-        task,
-        worker_id: str,
-        workspace_dir: Path,
-        artifact_storage,
-        batch_id: str,
-        chapter_id: str,
-        chapter_number: int,
+            self,
+            task,
+            worker_id,
+            workspace_dir,
+            artifact_storage,
+            batch_id,
+            chapter_id,
+            chapter_number,
+            api_client=None,
     ):
+
         super().__init__(
             task=task,
             worker_id=worker_id,
             workspace_dir=workspace_dir,
             artifact_storage=artifact_storage,
+            api_client=api_client,
         )
 
         self.batch_id = batch_id

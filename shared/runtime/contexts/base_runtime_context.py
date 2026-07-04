@@ -18,6 +18,7 @@ class BaseRuntimeContext(ABC):
             worker_id: str,
             workspace_dir: Path,
             artifact_storage: BaseArtifactStorage,
+            api_client=None,
     ):
         self.task = task
 
@@ -29,6 +30,8 @@ class BaseRuntimeContext(ABC):
             artifact_storage
         )
 
+        self.api_client = api_client
+
         self.channel = None
 
         self.mc_path = None
@@ -37,35 +40,6 @@ class BaseRuntimeContext(ABC):
 
     async def initialize(self):
         raise NotImplementedError
-
-    # @property
-    # def upstream_task(self):
-    #
-    #     return getattr(
-    #         self.task,
-    #         "depends_on_task",
-    #         None
-    #     )
-
-    # @property
-    # def upstream_output_path(self):
-    #
-    #     upstream = self.upstream_task
-    #
-    #     if not upstream:
-    #         return None
-    #
-    #     return upstream.output_path
-
-    # @property
-    # def upstream_manifest_path(self):
-    #
-    #     upstream = self.upstream_task
-    #
-    #     if not upstream:
-    #         return None
-    #
-    #     return upstream.manifest_path
 
     async def close(self):
         pass
