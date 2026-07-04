@@ -79,14 +79,14 @@ def register_executors():
         PREPROCESS_TEXT,
         PreprocessTextExecutor()
     )
-    TaskExecutorRegistry.register(
-        TRANSLATE_TEXT,
-        TranslateTextExecutor()
-    )
-    TaskExecutorRegistry.register(
-        REFINE_TEXT,
-        RefineTextExecutor()
-    )
+    # TaskExecutorRegistry.register(
+    #     TRANSLATE_TEXT,
+    #     TranslateTextExecutor()
+    # )
+    # TaskExecutorRegistry.register(
+    #     REFINE_TEXT,
+    #     RefineTextExecutor()
+    # )
     TaskExecutorRegistry.register(
         GENERATE_TTS_SEGMENTS,
         GenerateTtsSegmentsExecutor()

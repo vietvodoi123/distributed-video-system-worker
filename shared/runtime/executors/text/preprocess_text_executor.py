@@ -1,5 +1,3 @@
-import re
-
 from shared.runtime.executors.base.base_task_executor import (
     BaseTaskExecutor
 )
@@ -7,12 +5,15 @@ from shared.runtime.executors.base.base_task_executor import (
 from shared.text.cleaners.cn_cleaner import (
     clean_cn_content
 )
+
 from shared.text.cleaners.cn_validator import (
     validate_chapter_text
 )
+
 from shared.runtime.contexts.chapter_runtime_context import (
     ChapterRuntimeContext
 )
+
 
 class PreprocessTextExecutor(
     BaseTaskExecutor
@@ -20,44 +21,48 @@ class PreprocessTextExecutor(
 
     task_type = "preprocess_text"
 
+
     async def execute(
         self,
         task,
-        runtime_context:ChapterRuntimeContext
+        runtime_context: ChapterRuntimeContext
     ):
-        print(
-            "[PREPROCESS PAYLOAD]",
-            task.payload
-        )
-        storage = (
-            runtime_context
-            .artifact_storage
-        )
 
         # =====================================
-        # INPUT
+        # LOAD FROM DATABASE
         # =====================================
 
-        input_path = (
-            task.payload.get(
-                "input_path"
+        chapter = (
+            await runtime_context
+            .api_client
+            .get_chapter_text(
+                runtime_context.chapter_id
             )
         )
 
-        raw_text = await storage.read_text(
-            input_path
+
+        raw_text = (
+            chapter.get(
+                "raw_text"
+            )
         )
+
 
         if not raw_text:
 
             raise ValueError(
                 "raw text is empty"
             )
+
+
         # =====================================
-        # validate
+        # VALIDATE
         # =====================================
 
-        validate_chapter_text(raw_text)
+        validate_chapter_text(
+            raw_text
+        )
+
 
         # =====================================
         # CLEAN
@@ -67,19 +72,34 @@ class PreprocessTextExecutor(
             raw_text
         )
 
+
         # =====================================
-        # OUTPUT
+        # SAVE TO DATABASE
         # =====================================
 
-        output_path = (
+        await (
             runtime_context
-            .preprocess_text_path
+            .api_client
+            .update_chapter_text(
+
+                chapter_id=
+                runtime_context.chapter_id,
+
+                data={
+
+                    "cleaned_text":
+                    cleaned_text
+                }
+            )
         )
 
-        await storage.write_text(
-            output_path,
-            cleaned_text
+
+        print(
+            "[PreprocessTextExecutor]",
+            "saved cleaned_text",
+            runtime_context.chapter_number
         )
+
 
         # =====================================
         # RESULT
@@ -89,35 +109,37 @@ class PreprocessTextExecutor(
 
             "result": {
 
-                "input_path":
-                    input_path,
+                "chapter_id":
+                runtime_context.chapter_id,
 
-                "output_path":
-                    output_path,
 
                 "raw_length":
-                    len(raw_text),
+                len(raw_text),
+
 
                 "cleaned_length":
-                    len(cleaned_text),
+                len(cleaned_text),
+
+
                 "metrics": {
 
                     "input_length":
-                        len(raw_text),
+                    len(raw_text),
+
 
                     "output_length":
-                        len(cleaned_text)
+                    len(cleaned_text)
                 }
-            },
-
-            "output_path":
-                output_path
+            }
         }
 
+
     def get_resource_requirements(
-            self,
-            task,runtime_context
+        self,
+        task,
+        runtime_context
     ):
+
         return {
 
             "cpu": 1,
@@ -126,7 +148,7 @@ class PreprocessTextExecutor(
 
             "gpu": 0,
 
-            "network": 0,
+            "network": 1,
 
-            "disk_io": 1
+            "disk_io": 0
         }
