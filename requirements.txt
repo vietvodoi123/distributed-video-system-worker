@@ -22,3 +22,4 @@ torch
 sacremoses
 openai
 google-genai
+charset-normalizer

@@ -68,6 +68,20 @@ class GeminiApiService:
                     config=config,
                 )
 
+                if response.text is None:
+                    logger.error("=" * 100)
+                    logger.error("Gemini returned text=None")
+                    logger.error("finish_reason=%s",
+                                 response.candidates[0].finish_reason
+                                 if response.candidates else None)
+
+                    logger.error("response=%r", response)
+
+                    if response.candidates:
+                        logger.error("candidate=%r", response.candidates[0])
+
+                    raise RuntimeError("Gemini returned empty text.")
+
                 await self._key_pool.report_success(
                     key,
                 )

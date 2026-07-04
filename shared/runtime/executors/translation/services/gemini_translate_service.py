@@ -56,7 +56,6 @@ class GeminiTranslateService:
             response = await self._api_service.generate(
                 request,
             )
-
             result = self._post_processor.process(
                 source_text=text,
                 translated_text=response.text,

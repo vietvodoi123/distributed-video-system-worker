@@ -11,12 +11,48 @@ from shared.crawler.base_engine import (
 )
 
 
-class PlaywrightCrawlerEngine(
-    BaseCrawlerEngine
-):
+class PlaywrightCrawlerEngine(BaseCrawlerEngine):
 
     DEFAULT_TIMEOUT = 30000
     MIN_CONTENT_LENGTH = 200
+
+    BAD_CHARSETS = {
+        "windows-1252",
+        "iso-8859-1",
+        "latin1",
+        "us-ascii",
+    }
+
+    PREFERRED_ENCODINGS = (
+        "utf-8",
+        "utf-8-sig",
+        "gb18030",
+        "gbk",
+        "big5",
+    )
+
+    @classmethod
+    def _decode_response(
+        cls,
+        body: bytes,
+    ) -> str:
+
+        for encoding in cls.PREFERRED_ENCODINGS:
+
+            try:
+
+                return body.decode(
+                    encoding
+                )
+
+            except UnicodeDecodeError:
+
+                continue
+
+        return body.decode(
+            "utf-8",
+            errors="replace",
+        )
 
     async def get_html(
         self,
@@ -24,7 +60,9 @@ class PlaywrightCrawlerEngine(
         **kwargs,
     ) -> str:
 
-        css_content = kwargs.get("css_content")
+        css_content = kwargs.get(
+            "css_content"
+        )
 
         async with async_playwright() as p:
 
@@ -36,16 +74,27 @@ class PlaywrightCrawlerEngine(
 
             try:
 
-                await page.goto(
+                response = await page.goto(
+
                     url,
+
                     wait_until="domcontentloaded",
+
                     timeout=self.DEFAULT_TIMEOUT,
                 )
+
+                if response is None:
+
+                    raise RuntimeError(
+                        f"No response: {url}"
+                    )
 
                 if css_content:
 
                     await self._wait_content_ready(
+
                         page,
+
                         css_content,
                     )
 
@@ -53,7 +102,23 @@ class PlaywrightCrawlerEngine(
 
                     await asyncio.sleep(2)
 
-                return await page.content()
+                charset = (
+                    await page.evaluate(
+                        "document.characterSet"
+                    )
+                ).lower()
+
+                # Browser decode đúng
+                if charset not in self.BAD_CHARSETS:
+
+                    return await page.content()
+
+                # Browser decode sai -> lấy bytes gốc
+                body = await response.body()
+
+                return self._decode_response(
+                    body
+                )
 
             finally:
 
@@ -77,10 +142,14 @@ class PlaywrightCrawlerEngine(
 
         try:
 
-            locator = page.locator(selector)
+            locator = page.locator(
+                selector
+            )
 
             await locator.wait_for(
+
                 state="visible",
+
                 timeout=self.DEFAULT_TIMEOUT,
             )
 

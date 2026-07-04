@@ -19,7 +19,7 @@ class TranslationPostProcessor:
         source_text: str,
         translated_text: str,
     ) -> PostProcessResult:
-
+        print(translated_text)
         text = translated_text.strip()
 
         for _ in range(self.MAX_NORMALIZE_PASSES):
