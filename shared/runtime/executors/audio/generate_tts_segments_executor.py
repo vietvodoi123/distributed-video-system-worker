@@ -14,6 +14,7 @@ from shared.runtime.contexts.chapter_runtime_context import (
     ChapterRuntimeContext
 )
 
+
 class GenerateTtsSegmentsExecutor(
     BaseTaskExecutor
 ):
@@ -21,7 +22,7 @@ class GenerateTtsSegmentsExecutor(
     async def execute(
         self,
         task,
-        runtime_context:ChapterRuntimeContext
+        runtime_context: ChapterRuntimeContext
     ):
 
         started_at = time.time()
@@ -32,44 +33,39 @@ class GenerateTtsSegmentsExecutor(
         )
 
         # =====================================
-        # INPUT
+        # LOAD SCRIPT FROM DB
         # =====================================
 
-        input_path = (
-            task.payload.get(
-                "input_path"
+        chapter = (
+            await runtime_context
+            .api_client
+            .get_chapter_text(
+                runtime_context.chapter_id
             )
         )
 
-        if not input_path:
-
-            raise ValueError(
-                "Missing final script path"
+        script_text = (
+            chapter.get(
+                "final_script"
             )
-
-        if not await storage.exists(
-            input_path
-        ):
-
-            raise FileNotFoundError(
-                f"Input not found: "
-                f"{input_path}"
+            or
+            chapter.get(
+                "translated_text"
             )
-
-        script_text = await storage.read_text(
-            input_path
         )
-
-        script_text = script_text.strip()
 
         if not script_text:
 
             raise ValueError(
-                "Final script is empty"
+                "script text is empty"
             )
 
+        script_text = (
+            script_text.strip()
+        )
+
         # =====================================
-        # SPLIT LINES
+        # SPLIT LINE
         # =====================================
 
         lines = split_script_lines(
@@ -90,10 +86,6 @@ class GenerateTtsSegmentsExecutor(
             f"tts_{uuid.uuid4().hex}"
         )
 
-        # =====================================
-        # VOICE
-        # =====================================
-
         voice = (
             task.payload.get(
                 "voice",
@@ -102,7 +94,7 @@ class GenerateTtsSegmentsExecutor(
         )
 
         # =====================================
-        # SEGMENTS
+        # CREATE SEGMENTS
         # =====================================
 
         segments = []
@@ -115,10 +107,14 @@ class GenerateTtsSegmentsExecutor(
             )
 
             output_path = (
+
                 f"{runtime_context.chapter_dir}"
+
                 f"/tts/audio/"
+
                 f"{output_name}"
             )
+
 
             segments.append({
 
@@ -138,13 +134,15 @@ class GenerateTtsSegmentsExecutor(
                 output_path
             })
 
+
         # =====================================
-        # MANIFEST
+        # MANIFEST STILL MINIO
         # =====================================
 
         manifest = {
 
-            "success": True,
+            "success":
+            True,
 
             "executor":
             self.__class__.__name__,
@@ -161,79 +159,86 @@ class GenerateTtsSegmentsExecutor(
             "generated_at":
             datetime.utcnow().isoformat(),
 
-            "input_path":
-            input_path,
-
             "segments":
             segments
         }
 
+
         manifest_path = (
 
             f"{runtime_context.chapter_dir}"
+
             f"/tts/metadata/"
+
             f"tts_generation_manifest.json"
         )
 
+
         await storage.write_json(
+
             manifest_path,
+
             manifest
         )
+
 
         duration = round(
             time.time() - started_at,
             2
         )
 
+
         print(
-
-            "[GenerateTtsSegmentsExecutor] "
-
-            f"Prepared {len(segments)} "
-
-            f"TTS segments"
+            "[GenerateTtsSegmentsExecutor]",
+            f"Prepared {len(segments)} segments"
         )
 
-        # =====================================
-        # RESULT
-        # =====================================
 
         return {
 
             "manifest_path":
             manifest_path,
 
+
             "result": {
 
                 "task_group":
                 task_group,
 
+
                 "segments":
                 segments,
+
 
                 "total_segments":
                 len(segments),
 
+
                 "duration_seconds":
                 duration,
+
+
                 "metrics": {
 
                     "output_segments":
-                        len(segments),
+                    len(segments),
+
 
                     "output_length":
-                        len(script_text),
+                    len(script_text),
+
 
                     "executor_duration":
-                        duration
+                    duration
                 }
             }
         }
 
+
     def get_resource_requirements(
-            self,
-            task,
-            runtime_context
+        self,
+        task,
+        runtime_context
     ):
 
         return {
@@ -244,13 +249,9 @@ class GenerateTtsSegmentsExecutor(
 
             "gpu": 0,
 
-            "network": 0,
+            "network": 1,
 
-            "disk_io": 2,
-
-            # =================================
-            # IMPORTANT
-            # =================================
+            "disk_io": 1,
 
             "queue_pressure": 5
         }

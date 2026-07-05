@@ -26,46 +26,44 @@ class GenerateLineTaskExecutor(
 
         started_at = time.time()
 
-        storage = (
-            runtime_context
-            .artifact_storage
-        )
-
         # =====================================
-        # INPUT
+        # LOAD TEXT FROM DB
         # =====================================
 
-        input_path = (
-            task.payload.get(
-                "input_path"
+        chapter = (
+            await runtime_context
+            .api_client
+            .get_chapter_text(
+                runtime_context.chapter_id
             )
         )
 
-        if not input_path:
-
-            raise ValueError(
-                "Missing input_path"
-            )
-
-        if not await storage.exists(
-            input_path
-        ):
-
-            raise FileNotFoundError(
-                f"Input not found: {input_path}"
-            )
 
         script_text = (
-            await storage.read_text(
-                input_path
+
+            chapter.get(
+                "final_script"
             )
-        ).strip()
+
+            or
+
+            chapter.get(
+                "translated_text"
+            )
+        )
+
 
         if not script_text:
 
             raise ValueError(
-                "Translated script is empty"
+                "translated text is empty"
             )
+
+
+        script_text = (
+            script_text.strip()
+        )
+
 
         # =====================================
         # SPLIT
@@ -75,11 +73,13 @@ class GenerateLineTaskExecutor(
             script_text
         )
 
+
         if not lines:
 
             raise ValueError(
                 "No valid script lines found"
             )
+
 
         # =====================================
         # CONFIG
@@ -89,10 +89,18 @@ class GenerateLineTaskExecutor(
             f"tts_{uuid.uuid4().hex}"
         )
 
-        voice = task.payload.get(
-            "voice",
-            "default"
+
+        voice = (
+
+            task.payload.get(
+                "voice"
+            )
+
+            or
+
+            "vi-vn-x-vie-local"
         )
+
 
         # =====================================
         # BUILD LINE TASKS
@@ -100,38 +108,58 @@ class GenerateLineTaskExecutor(
 
         segments = []
 
+
         for line in lines:
 
+
             output_name = (
+
                 f"{task_group}_"
+
                 f"{line.line_index:04d}.wav"
             )
 
+
             output_path = (
+
                 f"{runtime_context.chapter_dir}"
+
                 f"/tts/audio/"
+
                 f"{output_name}"
             )
+
 
             segments.append({
 
                 "line_index":
                     line.line_index,
 
+
                 "line_text":
                     line.text,
 
+
                 "voice":
                     voice,
+
 
                 "output_path":
                     output_path
             })
 
+
         duration = round(
-            time.time() - started_at,
+
+            time.time()
+
+            -
+
+            started_at,
+
             2
         )
+
 
         print(
 
@@ -140,36 +168,63 @@ class GenerateLineTaskExecutor(
             f"Prepared {len(segments)} line tasks"
         )
 
-        # =====================================
-        # RESULT
-        # =====================================
 
         return {
 
             "result": {
 
+
                 "task_group":
                     task_group,
+
 
                 "segments":
                     segments,
 
+
                 "total_segments":
                     len(segments),
+
 
                 "duration_seconds":
                     duration,
 
+
                 "metrics": {
+
 
                     "output_segments":
                         len(segments),
 
+
                     "output_length":
                         len(script_text),
+
 
                     "executor_duration":
                         duration
                 }
             }
+        }
+
+
+    def get_resource_requirements(
+        self,
+        task,
+        runtime_context
+    ):
+
+        return {
+
+            "cpu": 1,
+
+            "ram": 1,
+
+            "gpu": 0,
+
+            "network": 1,
+
+            "disk_io": 0,
+
+            "queue_pressure": 5
         }
