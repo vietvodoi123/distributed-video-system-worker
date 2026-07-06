@@ -2,20 +2,29 @@ import re
 import unicodedata
 
 
-_CHINESE_RE = re.compile(r"[\u3400-\u9FFF]")
+_CHINESE_RE = re.compile(
+    r"[\u3400-\u9FFF]"
+)
 
 
-def validate_chapter_text(text: str) -> None:
+def validate_raw_text(
+    text: str
+) -> None:
     """
-    Raise ValueError nếu chapter có dấu hiệu bị hỏng.
+    Validate dữ liệu vừa crawl.
+    Chỉ bắt lỗi encoding/binary.
     """
 
     if not text or not text.strip():
-        raise ValueError("Chapter is empty.")
+
+        raise ValueError(
+            "Chapter is empty."
+        )
+
 
     total = len(text)
 
-    # Control characters (trừ \n \r \t)
+
     control = sum(
         1
         for ch in text
@@ -23,27 +32,65 @@ def validate_chapter_text(text: str) -> None:
         and ch not in ("\n", "\r", "\t")
     )
 
-    if control / total > 0.02:
+
+    if control / total > 0.10:
+
         raise ValueError(
-            f"Chapter appears to contain binary/corrupted data "
-            f"(control_chars={control}/{total})."
+            f"Binary corrupted content "
+            f"(control={control}/{total})"
         )
 
-    replacement = text.count("\uFFFD")
 
-    if replacement > 5:
+    replacement = text.count(
+        "\uFFFD"
+    )
+
+
+    if replacement > 50:
+
         raise ValueError(
-            "Chapter contains many Unicode replacement characters (�)."
+            f"Decode failed "
+            f"(replacement={replacement})"
         )
 
-    chinese = len(_CHINESE_RE.findall(text))
 
-    printable = sum(c.isprintable() for c in text)
 
-    if printable > 200 and chinese / printable < 0.03:
+def validate_cleaned_chapter(
+    text: str
+) -> None:
+
+
+    if not text:
+
         raise ValueError(
-            f"Invalid chapter content: "
-            f"control={control}/{total}, "
-            f"replacement={replacement}, "
-            f"chinese_ratio={chinese / max(printable, 1):.2%}"
+            "Cleaned chapter empty."
+        )
+
+
+    total = len(text)
+
+
+    chinese = len(
+        _CHINESE_RE.findall(
+            text
+        )
+    )
+
+
+    if total > 300 and chinese < 100:
+
+        raise ValueError(
+            f"Too little Chinese content "
+            f"(chinese={chinese})"
+        )
+
+
+    ratio = chinese / total
+
+
+    if total > 500 and ratio < 0.10:
+
+        raise ValueError(
+            f"Low Chinese ratio "
+            f"{ratio:.2%}"
         )

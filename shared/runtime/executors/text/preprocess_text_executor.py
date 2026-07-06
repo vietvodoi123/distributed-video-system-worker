@@ -7,7 +7,7 @@ from shared.text.cleaners.cn_cleaner import (
 )
 
 from shared.text.cleaners.cn_validator import (
-    validate_chapter_text
+    validate_raw_text, validate_cleaned_chapter
 )
 
 from shared.runtime.contexts.chapter_runtime_context import (
@@ -54,15 +54,13 @@ class PreprocessTextExecutor(
                 "raw text is empty"
             )
 
-
         # =====================================
-        # VALIDATE
+        # VALIDATE RAW
         # =====================================
 
-        validate_chapter_text(
+        validate_raw_text(
             raw_text
         )
-
 
         # =====================================
         # CLEAN
@@ -70,6 +68,14 @@ class PreprocessTextExecutor(
 
         cleaned_text = clean_cn_content(
             raw_text
+        )
+
+        # =====================================
+        # VALIDATE CLEANED
+        # =====================================
+
+        validate_cleaned_chapter(
+            cleaned_text
         )
 
 
