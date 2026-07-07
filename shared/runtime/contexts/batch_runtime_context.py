@@ -19,16 +19,18 @@ class BatchRuntimeContext(
     def __init__(
             self,
             task,
-            worker_id: str,
-            workspace_dir: Path,
+            worker_id,
+            workspace_dir,
             artifact_storage,
-            batch_id: str,
+            batch_id,
+            api_client=None,
     ):
         super().__init__(
             task=task,
             worker_id=worker_id,
             workspace_dir=workspace_dir,
             artifact_storage=artifact_storage,
+            api_client=api_client,
         )
 
         self.batch_id = batch_id
@@ -72,34 +74,38 @@ class BatchRuntimeContext(
 
     async def initialize(self):
 
-        batch = self.task.batch
-
-        if not batch:
-            raise ValueError(
-                "Task has no batch"
-            )
-
-        story = batch.story
-
-        if not story:
-            raise ValueError(
-                "Batch has no story"
-            )
-
-        channel = story.channel
-
-        if not channel:
-            raise ValueError(
-                "Story has no channel"
-            )
-
-        self.channel = channel
-
-        self.mc_path = (
-            channel.mc_path
+        payload = (
+                self.task.payload
+                or {}
         )
 
-        self.mc_name = (
-            channel.mc_name
+        channel = (
+            payload.get(
+                "channel"
+            )
         )
+
+        if channel:
+
+            self.channel = channel
+
+            self.mc_path = (
+                channel.get(
+                    "mc_path"
+                )
+            )
+
+            self.mc_name = (
+                channel.get(
+                    "mc_name"
+                )
+            )
+
+        else:
+
+            self.channel = None
+
+            self.mc_path = None
+
+            self.mc_name = None
 

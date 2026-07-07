@@ -18,7 +18,7 @@ async def create_runtime_context(
     # CHAPTER TASK
     # =====================================
 
-    if task.chapter is not None:
+    if task.chapter_id is not None:
 
         context = (
             ChapterRuntimeContext(

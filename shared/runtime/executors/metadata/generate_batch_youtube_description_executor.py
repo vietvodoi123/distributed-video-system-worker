@@ -1,9 +1,11 @@
 from shared.integrations.youtube.bootstrap import (
     youtube_api
 )
+
 from shared.runtime.executors.translation.services.dichnhanh_translate_service import (
     DichNhanhTranslateService
 )
+
 from shared.runtime.executors.base.base_task_executor import (
     BaseTaskExecutor
 )
@@ -12,10 +14,15 @@ from shared.runtime.artifacts.artifact_paths import (
     get_batch_output_dir
 )
 
-from shared.runtime.contexts.batch_runtime_context import (BatchRuntimeContext)
+from shared.runtime.contexts.batch_runtime_context import (
+    BatchRuntimeContext
+)
+
 from shared.utils.chapter_title_cleaner import (
     clean_chapter_title
 )
+
+
 class GenerateBatchYoutubeDescriptionExecutor(
     BaseTaskExecutor
 ):
@@ -24,10 +31,11 @@ class GenerateBatchYoutubeDescriptionExecutor(
         "generate_batch_youtube_description"
     )
 
+
     async def execute(
-        self,
-        task,
-        runtime_context:BatchRuntimeContext
+            self,
+            task,
+            runtime_context: BatchRuntimeContext
     ):
 
         storage = (
@@ -35,217 +43,233 @@ class GenerateBatchYoutubeDescriptionExecutor(
             .artifact_storage
         )
 
-        if not task.batch:
-            raise ValueError(
-                "Task batch missing"
-            )
-        story = task.batch.story
-
-        batch_id = str(
-            task.batch_id
+        payload = (
+            task.payload
         )
 
-        if not story:
-            raise ValueError(
-                "Story missing"
-            )
+
+        story = (
+            payload["story"]
+        )
+
+
+        channel = (
+            payload["channel"]
+        )
+
 
         chapters = (
-            task.payload.get(
+            payload.get(
                 "chapters",
                 []
             )
         )
+
+
+        batch_id = (
+            task.batch_id
+        )
+
 
         translator = (
             DichNhanhTranslateService()
         )
 
 
-        # =====================================
-        # CHANNEL
-        # =====================================
-
-        channel = story.channel
-
-        if not channel:
-
-            raise ValueError(
-                "Story has no channel"
-            )
+        # ================================
+        # CHANNEL INFO
+        # ================================
 
         channel_info = (
+
             youtube_api
             .get_channel_by_handle(
-                story.channel.youtube_channel_id
+
+                channel[
+                    "youtube_channel_id"
+                ]
             )
         )
 
-        # =====================================
-        # PLAYLIST
-        # =====================================
 
         youtube = (
+
             youtube_api
             .auth_provider
             .get_authenticated_service(
-                story.channel.youtube_channel_id
+
+                channel[
+                    "youtube_channel_id"
+                ]
             )
         )
 
+
         playlist_id = (
+
             youtube_api
             .get_or_create_playlist(
 
-                youtube=
-                youtube,
+                youtube=youtube,
 
                 playlist_name=
-                story.ai_title
-                or story.original_title,
+                    story["title"],
 
                 description=
-                story.description or ""
+                    story.get(
+                        "description"
+                    )
+                    or ""
             )
         )
 
+
         playlist_url = (
+
             "https://www.youtube.com/"
             f"playlist?list="
             f"{playlist_id}"
         )
 
+
+        # ================================
+        # TIMELINE
+        # ================================
+
         timeline_lines = []
 
         current_seconds = 0
 
+
         for chapter in chapters:
 
-            chapter_title_cn = (
-                chapter.get(
-                    "title",
-                    ""
-                )
+            title = chapter.get(
+                "title",
+                ""
             )
+
 
             try:
 
-                chapter_title_vi = (
-                    await translator.translate(
-                        chapter_title_cn
+                title = await (
+                    translator
+                    .translate(
+                        title
                     )
                 )
 
             except Exception:
+                pass
 
-                chapter_title_vi = (
-                    chapter_title_cn
-                )
 
-            chapter_title_vi = clean_chapter_title(
+            title = clean_chapter_title(
 
-                title=
-                chapter_title_vi,
+                title=title,
 
                 chapter_number=
-                chapter["chapter_number"]
+                    chapter[
+                        "chapter_number"
+                    ]
             )
+
 
             timestamp = (
 
                 f"{current_seconds // 3600:02d}:"
-                f"{(current_seconds % 3600) // 60:02d}:"
+                f"{(current_seconds % 3600)//60:02d}:"
                 f"{current_seconds % 60:02d}"
             )
 
-            line = (
+
+            timeline_lines.append(
+
                 f"{timestamp} "
-                f"Chương {chapter['chapter_number']}"
+                f"Chương "
+                f"{chapter['chapter_number']} "
+                f"- {title}"
             )
 
-            if chapter_title_vi:
-                line += f" - {chapter_title_vi}"
-
-            timeline_lines.append(line)
 
             current_seconds += int(
+
                 chapter.get(
                     "duration_seconds",
                     0
                 )
             )
 
+
         chapters_text = "\n".join(
             timeline_lines
         )
 
-        # =====================================
-        # DESCRIPTION
-        # =====================================
 
         description = (
+
             f"Tên truyện: "
-            f"{story.ai_title or story.original_title}\n\n"
-            f"Mô tả: "
-            f"{story.description}\n\n"
+            f"{story['title']}\n\n"
+
+            f"Mô tả:\n"
+            f"{story.get('description','')}\n\n"
+
             f"Mục lục:\n"
             f"{chapters_text}\n\n"
+
             f"Danh sách phát:\n"
             f"{playlist_url}\n\n"
+
             f"🎙Thông tin kênh:\n"
-            f"{channel_info.get('description', '')}\n\n"
+            f"{channel_info.get('description','')}\n\n"
+
             f"Đăng ký kênh:\n"
-            f"https://www.youtube.com/channel/"
-            f"{channel.youtube_channel_id}"
+            f"https://www.youtube.com/"
+            f"{channel['youtube_channel_id']}"
         )
 
-        # =====================================
-        # OUTPUT
-        # =====================================
 
         output_path = (
+
             f"{get_batch_output_dir(batch_id)}"
             "/metadata/"
             "youtube_description.txt"
         )
 
+
         await storage.write_text(
+
             output_path,
+
             description
         )
+
 
         return {
 
             "result": {
 
                 "story_title":
-                story.ai_title,
+                    story["title"],
 
                 "chapter_count":
-                len(chapters),
-
-                "output_path":
-                output_path
+                    len(chapters)
             },
 
             "output_path":
-            output_path
+                output_path
         }
+
 
     def get_resource_requirements(
             self,
-            task,runtime_context
+            task,
+            runtime_context
     ):
 
         return {
 
             "cpu": 1,
-
             "ram": 1,
-
             "gpu": 0,
-
             "network": 2,
-
             "disk_io": 1
         }

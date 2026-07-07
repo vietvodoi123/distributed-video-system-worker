@@ -32,14 +32,21 @@ class GenerateBatchYoutubeUploadExecutor(
             .artifact_storage
         )
 
-        story = task.batch.story
+        payload = (
+            task.payload
+        )
 
-        if not story:
-            raise ValueError(
-                "Story missing"
-            )
+        batch = (
+            payload["batch"]
+        )
 
-        payload = task.payload
+        story = (
+            payload["story"]
+        )
+
+        channel = (
+            payload["channel"]
+        )
 
         # =====================================
         # FILE PATHS
@@ -126,12 +133,11 @@ class GenerateBatchYoutubeUploadExecutor(
             # =================================
 
             chapter_eps = (
-                task.batch.batch_name
+                batch["name"]
             )
 
             story_title = (
-                story.ai_title
-                or story.original_title
+                story["title"]
             )
 
             upload_title = (
@@ -158,8 +164,9 @@ class GenerateBatchYoutubeUploadExecutor(
             )
 
             tags = [
-                story.ai_title
-                or story.original_title,
+
+                story["tags"],
+
                 "truyện audio",
                 "audio truyện",
                 "truyện tranh",
@@ -171,7 +178,7 @@ class GenerateBatchYoutubeUploadExecutor(
                 .upload_video_with_playlist(
 
                     channel_id=
-                    story.channel.youtube_channel_id,
+                    channel["youtube_channel_id"],
 
                     video_path=
                     str(local_video),
@@ -189,7 +196,10 @@ class GenerateBatchYoutubeUploadExecutor(
                     story_title,
 
                     playlist_description=
-                    story.description or "",
+                    story.get(
+                        "description",
+                        ""
+                    ),
 
                     thumbnail_path=
                     str(local_thumbnail),

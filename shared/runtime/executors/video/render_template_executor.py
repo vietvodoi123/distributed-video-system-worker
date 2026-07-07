@@ -38,6 +38,21 @@ class RenderTemplateExecutor(
         task,
         runtime_context:ChapterRuntimeContext
     ):
+        # =================================
+        # STORY METADATA
+        # =================================
+
+        payload = (
+            task.payload
+        )
+
+        story = (
+            payload["story"]
+        )
+
+        channel = (
+            payload["channel"]
+        )
 
         started_at = time.time()
 
@@ -97,9 +112,9 @@ class RenderTemplateExecutor(
         channel_info = (
             youtube_api
             .get_channel_by_handle(
-                runtime_context
-                .channel
-                .youtube_channel_id
+                channel[
+                    "youtube_channel_id"
+                ]
             )
         )
 
@@ -151,58 +166,50 @@ class RenderTemplateExecutor(
             / "template.mp4"
         )
 
-        # =================================
-        # STORY METADATA
-        # =================================
-
-        chapter = (
-            runtime_context
-            .task
-            .chapter
-        )
-        # print(task.payload.episode_number)
-        story = (
-            chapter.story
-        )
-
         metadata = {
 
             "title":
-            story.ai_title,
+                story["title"],
 
             "number_eps":
-                task.payload["episode_number"],
+                payload[
+                    "episode_number"
+                ],
 
             "type":
-            getattr(
-                story,
-                "genres",
-                ""
-            ),
+                story.get(
+                    "genre",
+                    ""
+                ),
 
             "background_url":
-            getattr(
-                story,
-                "background_image_url",
-                ""
-            ),
+                story.get(
+                    "background_image_url",
+                    ""
+                ),
 
             "channel_name":
-            channel_info["name"],
+                channel_info["name"],
 
             "channel_id":
-                runtime_context
-                .channel
-                .youtube_channel_id,
+                channel[
+                    "youtube_channel_id"
+                ],
 
             "channel_subs":
-            channel_info["subscribers"],
+                channel_info[
+                    "subscribers"
+                ],
 
             "channel_avatar_url":
-            channel_info["avatar_url"],
+                channel_info[
+                    "avatar_url"
+                ],
 
             "mc_name":
-            runtime_context.mc_name
+                channel[
+                    "mc_name"
+                ]
         }
 
         # =================================
@@ -247,9 +254,17 @@ class RenderTemplateExecutor(
             text=True
         )
 
+        print("=" * 80)
+        print("[renderer stdout]")
         print(process.stdout)
 
+        print("=" * 80)
+        print("[renderer stderr]")
         print(process.stderr)
+
+        print("=" * 80)
+        print("[return code]")
+        print(process.returncode)
 
         if process.returncode != 0:
             raise RuntimeError(

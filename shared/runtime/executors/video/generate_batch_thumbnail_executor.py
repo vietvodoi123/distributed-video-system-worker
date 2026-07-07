@@ -46,56 +46,62 @@ class GenerateBatchThumbnailExecutor(
         )
 
         # =================================
-        # STORY
+        # STORY METADATA
         # =================================
 
+        payload = (
+                task.payload
+                or {}
+        )
+
         batch = (
-            task.batch
+            payload.get(
+                "batch"
+            )
+        )
+
+        story = (
+            payload.get(
+                "story"
+            )
         )
 
         if not batch:
-
             raise ValueError(
-                "Task batch missing"
+                "Missing batch metadata"
             )
 
-        story = (
-            batch.story
-        )
-
         if not story:
-
             raise ValueError(
-                "Batch story missing"
+                "Missing story metadata"
             )
 
         title = (
-            getattr(
-                story,
-                "ai_title",
-                None
-            )
-            or ""
+                story.get(
+                    "title"
+                )
+                or ""
         ).strip()
 
         description = (
-            getattr(
-                story,
-                "description",
-                None
-            )
-            or ""
+                story.get(
+                    "description"
+                )
+                or ""
         ).strip()
 
         thumbnail_hook = (
-            getattr(
-                story,
-                "thumbnail_hook",
-                None
-            )
-            or ""
+                story.get(
+                    "thumbnail_hook"
+                )
+                or ""
         ).strip()
-        story_id = str(story.id)
+
+        story_id = (
+            story[
+                "id"
+            ]
+        )
         # =================================
         # VALIDATE
         # =================================
@@ -122,17 +128,12 @@ class GenerateBatchThumbnailExecutor(
         # EPISODE TEXT
         # =================================
 
-        episode_text = (
-
-            getattr(
-                batch,
-                "batch_name",
-                None
-            )
-        )
-
         episode_text = str(
-            episode_text
+
+            batch.get(
+                "name",
+                ""
+            )
         )
         print(
             "[GenerateBatchThumbnailExecutor] "

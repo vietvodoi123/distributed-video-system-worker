@@ -29,7 +29,23 @@ class GenerateMcLoopExecutor(
             runtime_context
             .artifact_storage
         )
+        payload = task.payload or {}
 
+        channel = payload.get("channel")
+
+        if not channel:
+            raise ValueError(
+                "Missing channel metadata in task payload"
+            )
+
+        mc_path = channel.get("mc_path")
+
+        if not mc_path:
+            raise ValueError(
+                "Missing channel.mc_path in task payload"
+            )
+
+        mc_name = channel.get("mc_name")
         # =====================================
         # TIMELINE
         # =====================================
@@ -104,7 +120,7 @@ class GenerateMcLoopExecutor(
             McLoopAssetManager(
 
                 mc_path=
-                runtime_context.mc_path,
+                mc_path,
 
                 artifact_storage=
                 storage
@@ -180,13 +196,9 @@ class GenerateMcLoopExecutor(
                 .isoformat()
             ),
 
-            "mc_name": (
-                runtime_context.mc_name
-            ),
+            "mc_name": mc_name,
 
-            "mc_path": (
-                runtime_context.mc_path
-            ),
+            "mc_path": mc_path,
 
             "target_duration": (
                 duration

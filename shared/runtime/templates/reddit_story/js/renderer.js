@@ -303,38 +303,57 @@ async function renderWorker(
 
 (async () => {
 
-  const chunked =
-    Array.from(
-      { length: NUM_WORKERS },
-      () => []
+  try {
+
+    const chunked =
+      Array.from(
+        { length: NUM_WORKERS },
+        () => []
+      );
+
+    indexedSegments.forEach(
+      (segment, i) => {
+
+        chunked[
+          i % NUM_WORKERS
+        ].push(segment);
+      }
     );
 
-  indexedSegments.forEach(
-    (segment, i) => {
+    bar.start(
+      indexedSegments.length,
+      0
+    );
 
-      chunked[
-        i % NUM_WORKERS
-      ].push(segment);
+    await Promise.all(
+
+      chunked.map(
+        (tasks) =>
+          renderWorker(tasks)
+      )
+    );
+
+    bar.stop();
+
+    console.log(
+      "🎉 Frames rendered."
+    );
+
+  } catch (err) {
+
+    console.error(
+      "[FATAL]",
+      err
+    );
+
+    if (err && err.stack) {
+
+      console.error(
+        err.stack
+      );
     }
-  );
 
-  bar.start(
-    indexedSegments.length,
-    0
-  );
-
-  await Promise.all(
-
-    chunked.map(
-      (tasks) =>
-        renderWorker(tasks)
-    )
-  );
-
-  bar.stop();
-
-  console.log(
-    "🎉 Frames rendered."
-  );
+    process.exit(1);
+  }
 
 })();

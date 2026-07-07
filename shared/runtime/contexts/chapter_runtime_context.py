@@ -215,46 +215,41 @@ class ChapterRuntimeContext(
 
     async def initialize(self):
 
-        chapter = self.task.chapter
+        payload = (
+                self.task.payload
+                or {}
+        )
 
-        if not chapter:
-            raise ValueError(
-                "Task has no chapter"
+        channel = (
+            payload.get(
+                "channel"
+            )
+        )
+
+        if channel:
+
+            self.channel = channel
+
+            self.mc_path = (
+                channel.get(
+                    "mc_path"
+                )
             )
 
-        story = chapter.story
-
-        if not story:
-            raise ValueError(
-                "Chapter has no story"
+            self.mc_name = (
+                channel.get(
+                    "mc_name"
+                )
             )
 
-        channel = story.channel
+        else:
 
-        if not channel:
-            raise ValueError(
-                "Story has no channel"
-            )
+            self.channel = None
+
+            self.mc_path = None
+
+            self.mc_name = None
 
         self.raw_title = (
-
-                chapter.original_title
-
-                or
-
-                chapter.translated_title
-
-                or
-
-                f"Chapter {chapter.chapter_number}"
-        )
-
-        self.channel = channel
-
-        self.mc_path = (
-            channel.mc_path
-        )
-
-        self.mc_name = (
-            channel.mc_name
+            f"Chapter {self.chapter_number}"
         )
