@@ -3,11 +3,10 @@ import subprocess
 
 
 def create_looped_mc_video_from_path(
-    local_input_path,
-    output_path,
-    duration
+        local_input_path,
+        output_path,
+        duration
 ):
-
     local_input_path = str(
         local_input_path
     )
@@ -17,16 +16,14 @@ def create_looped_mc_video_from_path(
     )
 
     if not os.path.exists(
-        local_input_path
+            local_input_path
     ):
-
         raise FileNotFoundError(
             f"❌ Không tìm thấy file: "
             f"{local_input_path}"
         )
 
     if duration is None:
-
         raise ValueError(
             "❌ duration không được None"
         )
@@ -82,8 +79,6 @@ def create_looped_mc_video_from_path(
 
         output_path
     ]
-
-
 
     subprocess.run(
         cmd,

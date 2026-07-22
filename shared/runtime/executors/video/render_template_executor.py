@@ -3,7 +3,6 @@ import subprocess
 import time
 
 from datetime import datetime
-from pathlib import Path
 
 from shared.runtime.executors.base.base_task_executor import (
     BaseTaskExecutor
@@ -14,7 +13,7 @@ from shared.runtime.templates.reddit_story.python.html_template_renderer import 
 )
 
 from shared.runtime.templates.reddit_story.python.generate_concat_txt import (
-    generate_frames_concat_from_timeline
+    generate_frames_concat_from_segments
 )
 
 from shared.runtime.templates.reddit_story.python.render_video import (
@@ -29,14 +28,15 @@ from shared.runtime.artifacts.artifact_paths import (
 )
 from shared.runtime.contexts.chapter_runtime_context import (ChapterRuntimeContext)
 
+
 class RenderTemplateExecutor(
     BaseTaskExecutor
 ):
 
     async def execute(
-        self,
-        task,
-        runtime_context:ChapterRuntimeContext
+            self,
+            task,
+            runtime_context: ChapterRuntimeContext
     ):
         # =================================
         # STORY METADATA
@@ -46,13 +46,15 @@ class RenderTemplateExecutor(
             task.payload
         )
 
-        story = (
-            payload["story"]
-        )
+        title = payload['title']
+        type = payload['type']
 
-        channel = (
-            payload["channel"]
-        )
+        number_eps = payload['number_eps']
+        background_url = payload['background_url']
+        youtube_channel_id = payload['youtube_channel_id']
+
+        mc_name = payload['mc_name']
+        segments = payload['segments']
 
         started_at = time.time()
 
@@ -62,59 +64,13 @@ class RenderTemplateExecutor(
         )
 
         # =================================
-        # LOAD TIMELINE
-        # =================================
-
-        timeline_artifact_path = task.payload.get(
-            "timeline_path"
-        )
-
-        if not timeline_artifact_path:
-            raise ValueError(
-                "Missing timeline_path"
-            )
-
-        local_timeline = await (
-            storage.get_local_path(
-                timeline_artifact_path,
-                runtime_context.workspace_dir
-            )
-        )
-
-        timeline_file = Path(
-            local_timeline
-        )
-
-        timeline_data = json.loads(
-
-            timeline_file.read_text(
-                encoding="utf-8"
-            )
-        )
-
-        segments = (
-            timeline_data.get(
-                "segments",
-                []
-            )
-        )
-
-        if not segments:
-
-            raise ValueError(
-                "Timeline empty"
-            )
-
-        # =================================
         # YOUTUBE METADATA
         # =================================
 
         channel_info = (
             youtube_api
             .get_channel_by_handle(
-                channel[
-                    "youtube_channel_id"
-                ]
+                youtube_channel_id
             )
         )
 
@@ -133,68 +89,54 @@ class RenderTemplateExecutor(
         )
 
         template_path = (
-            engine_dir
-            / "html/template.html"
+                engine_dir
+                / "html/template.html"
         )
 
         renderer_js = (
-            engine_dir
-            / "js/renderer.js"
+                engine_dir
+                / "js/renderer.js"
         )
 
         rendered_html = (
-            runtime_context
-            .workspace_dir
-            / "rendered.html"
+                runtime_context
+                .workspace_dir
+                / "rendered.html"
         )
 
         frames_dir = (
-            runtime_context
-            .workspace_dir
-            / "frames"
+                runtime_context
+                .workspace_dir
+                / "frames"
         )
 
         concat_path = (
-            runtime_context
-            .workspace_dir
-            / "concat.txt"
+                runtime_context
+                .workspace_dir
+                / "concat.txt"
         )
 
         local_output = (
-            runtime_context
-            .workspace_dir
-            / "template.mp4"
+                runtime_context
+                .workspace_dir
+                / "template.mp4"
         )
 
         metadata = {
 
-            "title":
-                story["title"],
+            "title": title,
 
-            "number_eps":
-                payload[
-                    "episode_number"
-                ],
+            "number_eps": number_eps,
 
-            "type":
-                story.get(
-                    "genre",
-                    ""
-                ),
+            "type": type,
 
-            "background_url":
-                story.get(
-                    "background_image_url",
-                    ""
-                ),
+            "background_url": background_url,
 
             "channel_name":
                 channel_info["name"],
 
             "channel_id":
-                channel[
-                    "youtube_channel_id"
-                ],
+                youtube_channel_id,
 
             "channel_subs":
                 channel_info[
@@ -206,10 +148,7 @@ class RenderTemplateExecutor(
                     "avatar_url"
                 ],
 
-            "mc_name":
-                channel[
-                    "mc_name"
-                ]
+            "mc_name": mc_name
         }
 
         # =================================
@@ -240,31 +179,24 @@ class RenderTemplateExecutor(
 
                 str(renderer_js),
 
-                str(timeline_file),
-
                 str(frames_dir),
 
                 str(rendered_html)
             ],
 
+            input=json.dumps(
+                segments,
+                ensure_ascii=False,
+            ),
+
             stdout=subprocess.PIPE,
 
             stderr=subprocess.PIPE,
 
-            text=True
+            text=True,
+
+            encoding="utf-8"
         )
-
-        print("=" * 80)
-        print("[renderer stdout]")
-        print(process.stdout)
-
-        print("=" * 80)
-        print("[renderer stderr]")
-        print(process.stderr)
-
-        print("=" * 80)
-        print("[return code]")
-        print(process.returncode)
 
         if process.returncode != 0:
             raise RuntimeError(
@@ -282,16 +214,10 @@ class RenderTemplateExecutor(
         # =================================
         # CONCAT
         # =================================
-        generate_frames_concat_from_timeline(
-
-            timeline_path=
-            timeline_file,
-
-            frames_dir=
-            frames_dir,
-
-            output_concat_path=
-            concat_path
+        generate_frames_concat_from_segments(
+            segments=segments,
+            frames_dir=frames_dir,
+            output_concat_path=concat_path
         )
 
         # =================================
@@ -314,7 +240,6 @@ class RenderTemplateExecutor(
         # =================================
 
         if not local_output.exists():
-
             raise FileNotFoundError(
                 "Template render failed"
             )
@@ -331,113 +256,8 @@ class RenderTemplateExecutor(
             local_output.read_bytes()
         )
 
-        # =================================
-        # MANIFEST
-        # =================================
-
-        manifest = {
-
-            "success": True,
-
-            "executor":
-            self.__class__.__name__,
-
-            "generated_at":
-            datetime.utcnow().isoformat(),
-
-            "timeline_path":
-            timeline_artifact_path,
-
-            "output_path":
-            runtime_context.template_video_path,
-
-            "segments":
-            len(segments),
-
-            "duration_seconds":
-            round(
-                time.time()
-                - started_at,
-                2
-            )
-        }
-
-        manifest_path = (
-            f"{runtime_context.chapter_dir}"
-            f"/video/metadata/"
-            f"template_manifest.json"
-        )
-
-        await storage.write_json(
-            manifest_path,
-            manifest
-        )
-
-        print(
-            "[RenderTemplateExecutor] "
-            "Completed"
-        )
-
         return {
-
             "output_path":
-            runtime_context
-            .template_video_path,
-
-            "manifest_path":
-            manifest_path,
-
-            "result":
-                {"manifest":manifest,
-                 "metrics": {
-
-                     "segment_count":
-                         len(segments),
-
-                     "executor_duration":
-                         round(
-                             time.time() - started_at,
-                             2
-                         )
-                 }
-                 }
-        }
-
-    def get_resource_requirements(
-            self,
-            task,runtime_context
-    ):
-
-        segment_count = (
-            task.payload.get(
-                "segment_count",
-                100
-            )
-        )
-
-        factor = max(
-            1,
-            segment_count / 100
-        )
-
-        return {
-
-            "cpu": min(
-                20,
-                6 * factor
-            ),
-
-            "ram": min(
-                24,
-                8 * factor
-            ),
-
-            "gpu": 0,
-
-            "network": 1,
-
-            "disk_io": min(
-                30,
-                10 * factor
-            )
+                runtime_context
+                .template_video_path,
         }

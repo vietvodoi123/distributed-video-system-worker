@@ -1,6 +1,3 @@
-import time
-
-from datetime import datetime
 from shared.config.settings import settings
 
 from shared.runtime.artifacts.artifact_paths import (
@@ -19,7 +16,6 @@ from shared.runtime.contexts.batch_runtime_context import (BatchRuntimeContext)
 class GenerateBatchThumbnailExecutor(
     BaseTaskExecutor
 ):
-
     task_type = (
         "generate_batch_thumbnail"
     )
@@ -29,12 +25,10 @@ class GenerateBatchThumbnailExecutor(
     # =====================================
 
     async def execute(
-        self,
-        task,
-        runtime_context:BatchRuntimeContext
+            self,
+            task,
+            runtime_context: BatchRuntimeContext
     ):
-
-        started_at = time.time()
 
         storage = (
             runtime_context
@@ -54,52 +48,27 @@ class GenerateBatchThumbnailExecutor(
                 or {}
         )
 
-        batch = (
-            payload.get(
-                "batch"
-            )
-        )
-
-        story = (
-            payload.get(
-                "story"
-            )
-        )
-
-        if not batch:
-            raise ValueError(
-                "Missing batch metadata"
-            )
-
-        if not story:
-            raise ValueError(
-                "Missing story metadata"
-            )
-
         title = (
-                story.get(
-                    "title"
-                )
-                or ""
+            payload.get(
+                "title"
+            )
         ).strip()
 
         description = (
-                story.get(
-                    "description"
-                )
-                or ""
+            payload.get(
+                "description"
+            )
         ).strip()
 
         thumbnail_hook = (
-                story.get(
-                    "thumbnail_hook"
-                )
-                or ""
+            payload.get(
+                "thumbnail_hook"
+            )
         ).strip()
 
         story_id = (
-            story[
-                "id"
+            payload[
+                "story_id"
             ]
         )
         # =================================
@@ -107,19 +76,16 @@ class GenerateBatchThumbnailExecutor(
         # =================================
 
         if not title:
-
             raise ValueError(
                 "Story title empty"
             )
 
         if not description:
-
             raise ValueError(
                 "Story description empty"
             )
 
         if not thumbnail_hook:
-
             raise ValueError(
                 "Thumbnail hook empty"
             )
@@ -130,8 +96,8 @@ class GenerateBatchThumbnailExecutor(
 
         episode_text = str(
 
-            batch.get(
-                "name",
+            payload.get(
+                "num_eps",
                 ""
             )
         )
@@ -188,7 +154,6 @@ class GenerateBatchThumbnailExecutor(
         # =================================
 
         if not local_thumbnail.exists():
-
             raise FileNotFoundError(
                 "Generated thumbnail missing"
             )
@@ -219,68 +184,6 @@ class GenerateBatchThumbnailExecutor(
             f"{runtime_context.thumbnail_path}"
         )
 
-        # =================================
-        # MANIFEST
-        # =================================
-
-        duration_seconds = round(
-            time.time() - started_at,
-            2
-        )
-
-        manifest = {
-
-            "success": True,
-
-            "executor": (
-                self.__class__.__name__
-            ),
-
-            "generated_at": (
-                datetime.utcnow()
-                .isoformat()
-            ),
-
-            "story_title": (
-                title
-            ),
-
-            "thumbnail_hook": (
-                thumbnail_hook
-            ),
-
-            "cache_key": (
-                manager.get_cache_key()
-            ),
-
-            "model": (
-                manager.model
-            ),
-
-            "output_path": (
-                runtime_context
-                .thumbnail_path
-            ),
-
-            "duration_seconds": (
-                duration_seconds
-            ),
-
-            "episode_text":
-                episode_text,
-        }
-
-        manifest_path = (
-            f"{runtime_context.batch_output_dir}"
-            f"/metadata/"
-            f"thumbnail_manifest.json"
-        )
-
-        await storage.write_json(
-            manifest_path,
-            manifest
-        )
-
         print(
             "[GenerateBatchThumbnailExecutor] "
             "Completed"
@@ -295,11 +198,5 @@ class GenerateBatchThumbnailExecutor(
             "output_path": (
                 runtime_context
                 .thumbnail_path
-            ),
-
-            "manifest_path": (
-                manifest_path
-            ),
-
-            "result": manifest
+            )
         }

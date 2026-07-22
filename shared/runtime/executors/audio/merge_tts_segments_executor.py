@@ -32,7 +32,6 @@ class MergeTtsSegmentsExecutor(
         )
 
         merge_payload = task.payload or {}
-
         segments = merge_payload.get(
             "segments",
             []
@@ -134,11 +133,6 @@ class MergeTtsSegmentsExecutor(
             merged_bytes
         )
 
-        duration = round(
-            time.time() - started_at,
-            2
-        )
-
         print(
 
             "[MergeTtsSegmentsExecutor] "
@@ -149,134 +143,62 @@ class MergeTtsSegmentsExecutor(
         )
 
         # =====================================
-        # timeline
+        # BUILD SEGMENTS
         # =====================================
-        timeline_segments: list[TimelineSegment] = []
+
+        result_segments = []
 
         current_time = 0.0
 
         for segment in segments:
-            duration = (
-                segment["duration"]
+            segment_duration = round(
+                segment["duration"],
+                3,
             )
 
-            start_time = current_time
-
-            end_time = (
-                    current_time + duration
+            start_time = round(
+                current_time,
+                3,
             )
 
-            timeline_segments.append(
-
-                TimelineSegment(
-
-                    line_index=
-                    segment[
-                        "line_index"
-                    ],
-
-                    text=
-                    segment[
-                        "line_text"
-                    ],
-
-                    start_time=
-                    round(start_time, 3),
-
-                    end_time=
-                    round(end_time, 3),
-
-                    duration=
-                    round(duration, 3),
-
-                    audio_path=
-                    segment[
-                        "output_path"
-                    ]
-                )
+            end_time = round(
+                current_time + segment_duration,
+                3,
             )
+
+            result_segments.append({
+
+                "line_index":
+                    segment["line_index"],
+
+                "line_text":
+                    segment["line_text"],
+
+                "start_time":
+                    start_time,
+
+                "end_time":
+                    end_time,
+
+                "duration":
+                    segment_duration,
+            })
 
             current_time = end_time
 
-        await storage.write_json(
-
-            runtime_context.timeline_path,
-
-            {
-                "total_duration":
-                    round(current_time, 3),
-
-                "total_segments":
-                    len(timeline_segments),
-
-                "segments": [
-
-                    {
-                        "line_index":
-                            s.line_index,
-
-                        "text":
-                            s.text,
-
-                        "start_time":
-                            s.start_time,
-
-                        "end_time":
-                            s.end_time,
-
-                        "duration":
-                            s.duration,
-
-                        "audio_path":
-                            s.audio_path
-                    }
-
-                    for s in timeline_segments
-                ]
-            }
-        )
         # =====================================
         # RESULT
         # =====================================
 
         return {
 
-            "output_path": (
-                runtime_context
-                .narration_wav_path
-            ),
+            "output_path":
+                runtime_context.narration_wav_path,
 
-            "manifest_path": (
-                runtime_context
-                .timeline_path
-            ),
+            "duration":
+                round(current_time, 3),
 
-            "result": {
+            "segments":
+                result_segments,
 
-                "success": True,
-
-                "merged_segments": (
-                    len(local_files)
-                ),
-
-                "duration_seconds": (
-                    current_time
-                ),
-
-                "timeline_path": (
-                    runtime_context
-                    .timeline_path
-                ),
-                "metrics": {
-
-                    "output_segments":
-                        len(local_files),
-
-                    "duration_seconds":
-                        current_time,
-
-                    "executor_duration":
-                        duration
-                }
-            }
         }

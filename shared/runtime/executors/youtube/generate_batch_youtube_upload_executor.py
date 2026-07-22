@@ -13,18 +13,43 @@ from shared.runtime.executors.base.base_task_executor import (
 )
 
 
+def normalize_youtube_tags(tags):
+    result = []
+    total = 0
+
+    for tag in tags:
+        tag = str(tag).strip()
+
+        if not tag:
+            continue
+
+        # giới hạn mỗi tag
+        if len(tag) > 40:
+            tag = tag[:40]
+
+        # YouTube tính thêm dấu phân cách
+        next_size = len(tag) + 2
+
+        if total + next_size >= 450:
+            break
+
+        result.append(tag)
+        total += next_size
+
+    return result
+
+
 class GenerateBatchYoutubeUploadExecutor(
     BaseTaskExecutor
 ):
-
     task_type = (
         "youtube_upload"
     )
 
     async def execute(
-        self,
-        task,
-        runtime_context: BatchRuntimeContext
+            self,
+            task,
+            runtime_context: BatchRuntimeContext
     ):
 
         storage = (
@@ -34,18 +59,6 @@ class GenerateBatchYoutubeUploadExecutor(
 
         payload = (
             task.payload
-        )
-
-        batch = (
-            payload["batch"]
-        )
-
-        story = (
-            payload["story"]
-        )
-
-        channel = (
-            payload["channel"]
         )
 
         # =====================================
@@ -69,32 +82,28 @@ class GenerateBatchYoutubeUploadExecutor(
         # =====================================
 
         if not await storage.exists(
-            final_video_path
+                final_video_path
         ):
-
             raise FileNotFoundError(
                 f"Missing final video: "
                 f"{final_video_path}"
             )
 
         if not await storage.exists(
-            description_path
+                description_path
         ):
-
             raise FileNotFoundError(
                 f"Missing youtube description: "
                 f"{description_path}"
             )
 
         if not await storage.exists(
-            thumbnail_path
+                thumbnail_path
         ):
-
             raise FileNotFoundError(
                 f"Missing thumbnail: "
                 f"{thumbnail_path}"
             )
-
 
         try:
 
@@ -133,11 +142,11 @@ class GenerateBatchYoutubeUploadExecutor(
             # =================================
 
             chapter_eps = (
-                batch["name"]
+                payload["num_eps"]
             )
 
             story_title = (
-                story["title"]
+                payload["title"]
             )
 
             upload_title = (
@@ -160,25 +169,38 @@ class GenerateBatchYoutubeUploadExecutor(
             publish_at = (
                 task.payload.get(
                     "publish_at"
-                )
+                ), None
             )
 
+            raw_tags = payload.get("tags", [])
+
+            if isinstance(raw_tags, str):
+                raw_tags = raw_tags.split(",")
+
             tags = [
-
-                story["tags"],
-
+                *raw_tags,
                 "truyện audio",
-                "audio truyện",
-                "truyện tranh",
-                "radio truyện"
+                "truyện full",
+                "nghe truyện",
+                "audio hay",
             ]
+
+            tags = [
+                tag.strip()
+                for tag in tags
+                if tag.strip()
+            ]
+            tags = normalize_youtube_tags(tags)
+            print(
+                "[GenerateBatchYoutubeUploadExecutor] ")
+            print(tags)
 
             video_url = (
                 youtube_api
                 .upload_video_with_playlist(
 
                     channel_id=
-                    channel["youtube_channel_id"],
+                    payload["youtube_channel_id"],
 
                     video_path=
                     str(local_video),
@@ -189,14 +211,13 @@ class GenerateBatchYoutubeUploadExecutor(
                     description=
                     description,
 
-                    tags=
-                    tags,
+                    tags=tags,
 
                     playlist_name=
                     story_title,
 
                     playlist_description=
-                    story.get(
+                    payload.get(
                         "description",
                         ""
                     ),
@@ -260,4 +281,3 @@ class GenerateBatchYoutubeUploadExecutor(
             )
 
             raise
-

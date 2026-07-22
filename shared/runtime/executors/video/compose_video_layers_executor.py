@@ -15,18 +15,18 @@ from shared.runtime.contexts.chapter_runtime_context import (
     ChapterRuntimeContext
 )
 
+
 class ComposeVideoLayersExecutor(
     BaseTaskExecutor
 ):
-
     CAPABILITIES = [
         "ffmpeg"
     ]
 
     async def execute(
-        self,
-        task,
-        runtime_context:ChapterRuntimeContext
+            self,
+            task,
+            runtime_context: ChapterRuntimeContext
     ):
         started_at = time.time()
 
@@ -56,6 +56,7 @@ class ComposeVideoLayersExecutor(
                 "mc_loop_video_path"
             )
         )
+
         required = [
 
             template_path,
@@ -102,12 +103,12 @@ class ComposeVideoLayersExecutor(
                 runtime_context.workspace_dir
             )
         )
-
+        print("MC:", local_mc_loop)
+        print("Exists:", local_mc_loop.exists())
+        print("Size:", local_mc_loop.stat().st_size)
         # =====================================
         # VALIDATE FILE EXISTENCE
         # =====================================
-
-
 
         required = [
 
@@ -129,9 +130,9 @@ class ComposeVideoLayersExecutor(
 
         local_output = (
 
-            runtime_context
-            .workspace_dir
-            / "composited.mp4"
+                runtime_context
+                .workspace_dir
+                / "composited.mp4"
         )
 
         # =====================================
@@ -191,13 +192,11 @@ class ComposeVideoLayersExecutor(
         # =====================================
 
         if not local_output.exists():
-
             raise FileNotFoundError(
                 "Compose render failed"
             )
 
         if local_output.stat().st_size <= 0:
-
             raise ValueError(
                 "Composited video empty"
             )
@@ -213,60 +212,6 @@ class ComposeVideoLayersExecutor(
             local_output.read_bytes()
         )
 
-        # =====================================
-        # MANIFEST
-        # =====================================
-
-        manifest = {
-
-            "success": True,
-
-            "executor":
-            self.__class__.__name__,
-
-            "generated_at":
-            datetime.utcnow().isoformat(),
-
-            "template_video":
-            template_path,
-
-            "text_scroll_video":
-            text_scroll_path,
-
-            "mc_loop_video":
-            mc_loop_path,
-
-            "output_path":
-            composited_path,
-
-            "layers": [
-
-                "template",
-                "text_scroll",
-                "mc_loop"
-            ],
-
-            "render_time_seconds":
-            round(
-                time.time()
-                - started_at,
-                2
-            )
-        }
-
-        manifest_path = (
-
-            f"{runtime_context.chapter_dir}"
-            f"/video/metadata/"
-            f"compose_manifest.json"
-        )
-
-        await storage.write_json(
-
-            manifest_path,
-            manifest
-        )
-
         print(
 
             "[ComposeVideoLayersExecutor] "
@@ -280,13 +225,6 @@ class ComposeVideoLayersExecutor(
         return {
 
             "output_path":
-            composited_path,
+                composited_path,
 
-            "manifest_path":
-            manifest_path,
-
-            "result":
-            manifest
         }
-
-    

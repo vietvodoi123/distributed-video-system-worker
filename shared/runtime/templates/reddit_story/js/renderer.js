@@ -7,87 +7,58 @@ const cliProgress = require("cli-progress");
 // INPUTS
 // ========================================
 
-const timelinePath =
-  process.argv[2];
+const frameDir = process.argv[2];
 
-const frameDir =
-  process.argv[3];
-
-const renderedPath =
-  process.argv[4];
-
-if (!timelinePath) {
-
-  throw new Error(
-    "Missing timeline.json path"
-  );
-}
+const renderedPath = process.argv[3];
 
 if (!frameDir) {
-
-  throw new Error(
-    "Missing frames directory"
-  );
+  throw new Error("Missing frames directory");
 }
 
 if (!renderedPath) {
-
-  throw new Error(
-    "Missing rendered.html path"
-  );
+  throw new Error("Missing rendered.html path");
 }
+// ========================================
+// LOAD TEMPLATE
+// ========================================
+
+const template = fs.readFileSync(renderedPath, "utf-8");
 
 // ========================================
-// LOAD FILES
+// LOAD SEGMENTS FROM STDIN
 // ========================================
 
-const timeline = JSON.parse(
+async function readSegments() {
+  return new Promise((resolve, reject) => {
+    let input = "";
 
-  fs.readFileSync(
-    timelinePath,
-    "utf-8"
-  )
-);
+    process.stdin.setEncoding("utf8");
 
-const template = fs.readFileSync(
+    process.stdin.on("data", (chunk) => {
+      input += chunk;
+    });
 
-  renderedPath,
-  "utf-8"
-);
+    process.stdin.on("end", () => {
+      try {
+        const segments = JSON.parse(input);
 
-const segments =
-  timeline.segments || [];
+        if (!Array.isArray(segments)) {
+          throw new Error("Input must be an array of segments.");
+        }
 
-if (!segments.length) {
-
-  throw new Error(
-    "Timeline has no segments"
-  );
+        resolve(segments);
+      } catch (err) {
+        reject(err);
+      }
+    });
+  });
 }
-
-// ========================================
-// INDEXED SEGMENTS
-// ========================================
-
-const indexedSegments =
-
-  segments.map(
-    (segment, index) => ({
-
-      ...segment,
-
-      render_index: index
-    })
-  );
 
 // ========================================
 // DIRS
 // ========================================
 
-fs.mkdirSync(
-  frameDir,
-  { recursive: true }
-);
+fs.mkdirSync(frameDir, { recursive: true });
 
 // ========================================
 // CONFIG
@@ -99,19 +70,15 @@ const NUM_WORKERS = 1;
 // PROGRESS
 // ========================================
 
-const bar =
-  new cliProgress.SingleBar({
+const bar = new cliProgress.SingleBar({
+  format: "📷 Render | {bar} | {value}/{total} | ETA: {eta_formatted}",
 
-    format:
-      "📷 Render | {bar} | {value}/{total} | ETA: {eta_formatted}",
+  barCompleteChar: "\u2588",
 
-    barCompleteChar: "\u2588",
+  barIncompleteChar: "\u2591",
 
-    barIncompleteChar: "\u2591",
-
-    hideCursor: true
-
-  });
+  hideCursor: true,
+});
 
 let completed = 0;
 
@@ -119,100 +86,90 @@ let completed = 0;
 // WORKER
 // ========================================
 
-async function renderWorker(
-  tasks
-) {
-
+async function renderWorker(tasks, indexedSegments) {
   const browser = await puppeteer.launch({
-    executablePath:
-      "C:/Program Files/Google/Chrome/Application/chrome.exe",
+    executablePath: "C:/Program Files/Google/Chrome/Application/chrome.exe",
     headless: "new",
     args: [
       "--no-sandbox",
-      "--disable-setuid-sandbox"
-    ]
-});
+      "--disable-setuid-sandbox",
 
-  const page =
-    await browser.newPage();
+      "--disable-dev-shm-usage",
+
+      "--disable-background-networking",
+
+      "--disable-renderer-backgrounding",
+
+      "--mute-audio",
+    ],
+  });
+
+  const page = await browser.newPage();
 
   await page.setViewport({
-
     width: 1280,
 
-    height: 720
+    height: 720,
   });
 
   await page.emulateMediaFeatures([
     {
       name: "prefers-reduced-motion",
-      value: "reduce"
-    }
+      value: "reduce",
+    },
   ]);
 
+  // ==================================
+  // BUILD HTML ONCE
+  // ==================================
+
+  const html = template.replace(
+    "{{LINES}}",
+
+    indexedSegments
+      .map(
+        (s) => `
+
+              <span
+                class="segment"
+                data-index="${s.render_index}"
+              >
+                ${s.line_text}
+              </span>
+
+            `,
+      )
+      .join("\n"),
+  );
+
+  // ==================================
+  // LOAD PAGE
+  // ==================================
+
+  await page.setContent(
+    html,
+
+    {
+      waitUntil: "domcontentloaded",
+    },
+  );
+
+  await page.evaluate(() => document.fonts.ready);
+
+  await page.waitForSelector(".segment");
+  // ==================================
+  // CACHE DOM
+  // ==================================
+
+  await page.evaluate(() => {
+    window.segmentElements = Array.from(document.querySelectorAll(".segment"));
+
+    window.currentHighlight = null;
+  });
+
   for (const segment of tasks) {
-
     try {
-
-      const index =
-        segment.line_index;
-
-      // ==================================
-      // BUILD HTML
-      // ==================================
-
-      const html =
-        template.replace(
-
-          "{{LINES}}",
-
-          indexedSegments
-            .map((s) => {
-
-              const cls =
-
-                s.render_index === index
-                  ? "segment highlight"
-                  : "segment";
-
-              return `
-                <span class="${cls}">
-                  ${s.text}
-                </span>
-              `;
-            })
-            .join("\n")
-        );
-
-      // ==================================
-      // SET CONTENT
-      // ==================================
-
-      await page.setContent(
-
-        html,
-
-        {
-          waitUntil:
-            "domcontentloaded"
-        }
-      );
-
-      // ==================================
-      // WAIT FONTS
-      // ==================================
-
-      await page.evaluate(
-        () => document.fonts.ready
-      );
-
-      // ==================================
-      // WAIT ELEMENT
-      // ==================================
-
-      await page.waitForSelector(
-        ".segment"
-      );
+      const line_index = segment.line_index;
 
       // ==================================
       // SCROLL ACTIVE SEGMENT
@@ -220,75 +177,72 @@ async function renderWorker(
 
       await page.evaluate(
         (index) => {
+          const elements = window.segmentElements;
 
-          const elements =
-            document.querySelectorAll(
-              ".segment"
-            );
-
-          const el =
-            elements[index];
-
-          if (el) {
-
-            el.scrollIntoView({
-
-              behavior: "instant",
-
-              block: "center"
-            });
+          if (!elements) {
+            throw new Error("segmentElements not initialized.");
           }
 
+          if (window.currentHighlight) {
+            window.currentHighlight.classList.remove("highlight");
+          }
+
+          const el = elements[index];
+
+          if (!el) {
+            throw new Error(`Segment ${index} not found.`);
+          }
+
+          el.classList.add("highlight");
+
+          window.currentHighlight = el;
+
+          el.scrollIntoView({
+            behavior: "instant",
+
+            block: "center",
+          });
         },
-        index
+
+        line_index,
       );
 
       // ==================================
       // FRAME PATH
       // ==================================
 
-      const framePath =
-        path.join(
+      const framePath = path.join(
+        frameDir,
 
-          frameDir,
+        `frame${String(line_index).padStart(4, "0")}.jpg`,
+      );
 
-          `frame${String(index).padStart(4, "0")}.jpg`
-        );
-
+      await page.evaluate(
+        () => new Promise((resolve) => requestAnimationFrame(resolve)),
+      );
       // ==================================
       // SCREENSHOT
       // ==================================
 
       await page.screenshot({
-
         path: framePath,
 
         type: "jpeg",
 
-        quality: 85
+        quality: 85,
+
+        optimizeForSpeed: true,
+
+        captureBeyondViewport: false,
+
+        fromSurface: true,
       });
-
-      // ==================================
-      // VALIDATE
-      // ==================================
-
-      if (!fs.existsSync(framePath)) {
-
-        throw new Error(
-          `Frame missing after screenshot: ${framePath}`
-        );
-      }
 
       completed++;
 
       bar.update(completed);
-
     } catch (err) {
-
-      console.error(
-        "[Renderer] ERROR:",
-        err
-      );
+      console.error("[Renderer] ERROR:", err);
 
       throw err;
     }
@@ -302,58 +256,41 @@ async function renderWorker(
 // ========================================
 
 (async () => {
-
   try {
+    const segments = await readSegments();
 
-    const chunked =
-      Array.from(
-        { length: NUM_WORKERS },
-        () => []
-      );
+    if (!segments.length) {
+      throw new Error("No segments provided.");
+    }
 
-    indexedSegments.forEach(
-      (segment, i) => {
+    const indexedSegments = segments.map((segment, index) => ({
+      ...segment,
 
-        chunked[
-          i % NUM_WORKERS
-        ].push(segment);
-      }
-    );
+      render_index: index,
+    }));
 
-    bar.start(
-      indexedSegments.length,
-      0
-    );
+    const chunked = Array.from({ length: NUM_WORKERS }, () => []);
+
+    indexedSegments.forEach((segment, i) => {
+      chunked[i % NUM_WORKERS].push(segment);
+    });
+
+    bar.start(indexedSegments.length, 0);
 
     await Promise.all(
-
-      chunked.map(
-        (tasks) =>
-          renderWorker(tasks)
-      )
+      chunked.map((tasks) => renderWorker(tasks, indexedSegments)),
     );
 
     bar.stop();
 
-    console.log(
-      "🎉 Frames rendered."
-    );
-
+    console.log("🎉 Frames rendered.");
   } catch (err) {
-
-    console.error(
-      "[FATAL]",
-      err
-    );
+    console.error("[FATAL]", err);
 
     if (err && err.stack) {
-
-      console.error(
-        err.stack
-      );
+      console.error(err.stack);
     }
 
     process.exit(1);
   }
-
 })();

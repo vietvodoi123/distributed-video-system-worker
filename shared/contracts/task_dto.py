@@ -168,52 +168,25 @@ class TaskDto:
 
     chapter_number: int | None = None
 
-    payload: dict = field(
-        default_factory=dict
-    )
-
-    batch: BatchDto | None = None
-
-    chapter: ChapterDto | None = None
+    payload: dict = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, data):
-
         return cls(
 
             id=data["id"],
 
             task_type=data["task_type"],
 
-            task_stage=data.get(
-                "task_stage"
-            ),
+            task_stage=data.get("task_stage"),
 
-            task_group=data.get(
-                "task_group"
-            ),
+            task_group=data.get("task_group"),
 
-            payload=data.get(
-                "payload",
-                {}
-            ),
+            batch_id=data.get("batch_id"),
 
-            batch=BatchDto.from_dict(
-                data.get("batch")
-            ),
+            chapter_id=data.get("chapter_id"),
 
-            chapter=ChapterDto.from_dict(
-                data.get("chapter")
-            ),
-            batch_id=data.get(
-                "batch_id"
-            ),
+            chapter_number=data.get("chapter_number"),
 
-            chapter_id=data.get(
-                "chapter_id"
-            ),
-
-            chapter_number=data.get(
-                "chapter_number"
-            ),
+            payload=data.get("payload", {}),
         )

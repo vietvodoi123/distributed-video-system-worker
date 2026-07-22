@@ -19,7 +19,9 @@ from shared.crawler.playwright_engine import (
 from shared.runtime.contexts.chapter_runtime_context import (
     ChapterRuntimeContext
 )
-
+from shared.crawler.scrape_do_engine import (
+    ScrapeDoEngine
+)
 
 class CrawlChapterExecutor(
     BaseTaskExecutor
@@ -30,7 +32,7 @@ class CrawlChapterExecutor(
         task,
         runtime_context: ChapterRuntimeContext
     ):
-
+        print(task)
         payload = task.payload or {}
 
         source_url = payload.get(
@@ -161,6 +163,46 @@ class CrawlChapterExecutor(
                 .strip()
             )
 
+        elif engine_name == "scrape_do":
+            print(engine_name)
+            resolver = ChapterResolver(
+                engine=ScrapeDoEngine(
+                    token="cb00a7233e964b088be28a16408ce53999b8e3c8572"
+                )
+            )
+
+            chapter_data = await resolver.get_chapter(
+                source_url,
+
+                css_title=css_title,
+
+                css_content=css_content,
+
+                css_next=css_next
+            )
+
+            if not chapter_data:
+                raise ValueError(
+                    "Resolve chapter failed"
+                )
+
+            title = (
+                chapter_data
+                .get(
+                    "title",
+                    ""
+                )
+                .strip()
+            )
+
+            content = (
+                chapter_data
+                .get(
+                    "content",
+                    ""
+                )
+                .strip()
+            )
 
         # =========================
         # BS4

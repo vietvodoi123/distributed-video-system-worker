@@ -47,7 +47,6 @@ class BaseWorker(ABC):
 
     max_batch_size: int = 1
 
-    free_slots: int = 1
 
     # ======================================
     # INIT
@@ -91,16 +90,11 @@ class BaseWorker(ABC):
         # CONCURRENCY CONTROL
         # ==================================
 
-        self.running_tasks = set()
-
-        self.current_reserved_cost = 0
-
-        self.max_pending_tasks = 20
-
-        self.task_costs = {}
+        self.running_tasks: set[str] = set()
+        self.running_tasks_lock = asyncio.Lock()
 
         self.general_semaphore = (
-            asyncio.Semaphore(4)
+            asyncio.Semaphore(2)
         )
 
         self.refine_semaphore = (
@@ -108,12 +102,20 @@ class BaseWorker(ABC):
         )
         self.crawl_semaphore = asyncio.Semaphore(1)
 
+        self.inflight_tasks: set[asyncio.Task] = set()
+        self.max_slots = 10
 
+    def available_slots(self) -> int:
+        return max(
+            0,
+            self.max_slots - len(self.inflight_tasks)
+        )
     # ======================================
     # STORAGE
     # ======================================
 
-    def create_artifact_storage(self):
+    @staticmethod
+    def create_artifact_storage():
 
         storage = create_storage()
 
@@ -143,165 +145,88 @@ class BaseWorker(ABC):
             f"{self.capabilities}"
         )
 
-        while True:
+        lease_task = asyncio.create_task(
+            self.lease_loop()
+        )
+
+        try:
+
+            while True:
+
+                try:
+
+                    await self.poll_once()
+
+                except Exception as e:
+
+                    print(
+                        "[BaseWorker] "
+                        f"Worker loop error: "
+                        f"{str(e)}"
+                    )
+
+                    await asyncio.sleep(5)
+
+        finally:
+
+            lease_task.cancel()
 
             try:
+                await lease_task
 
-                await self.poll_once()
-
-            except Exception as e:
-
-                print(
-                    "[BaseWorker] "
-                    f"Worker loop error: "
-                    f"{str(e)}"
-                )
-
-                await asyncio.sleep(5)
+            except asyncio.CancelledError:
+                pass
 
     # ======================================
     # POLL
     # ======================================
 
     async def poll_once(self):
-        # ==================================
-        # RESERVE TASKS
-        # ==================================
-        if (
 
-                len(self.running_tasks)
-
-                >=
-
-                self.max_pending_tasks
-        ):
-            print(
-
-                "[BaseWorker]",
-
-                "Pending task limit reached:",
-
-                len(self.running_tasks)
-            )
-
-            await asyncio.sleep(
-                self.poll_interval
-            )
-
-            return
-
-        reservation = await self.api.claim_tasks(
-
+        response = await self.api.claim_tasks(
             worker_id=self.worker_id,
-
-            worker_type=
-            self.__class__.__name__,
-
-            capabilities=
-            self.capabilities,
-
-            available_capacity_cost=
-            self.get_available_capacity_cost(),
-
-            current_reserved_cost=
-            self.current_reserved_cost,
-
-            max_batch_size=
-            self.max_pending_tasks,
-
-            resource_capacity=
-            self.resource_capacity.to_dict()
+            worker_type=self.__class__.__name__,
+            capabilities=self.capabilities,
+            available_slots=self.available_slots(),
         )
 
-        # ==================================
-        # NO TASKS
-        # ==================================
+        tasks = response.get(
+            "tasks",
+            [],
+        )
 
-        if not reservation:
-
+        if not tasks:
             await asyncio.sleep(
-                self.poll_interval
+                response.get(
+                    "next_poll_in",
+                    self.poll_interval,
+                )
             )
 
             return
-
-        tasks = reservation["tasks"]
-        reserved_cost = (
-            reservation.get(
-                "used_cost",
-                0
-            )
-        )
-
-        self.current_reserved_cost += (
-            reserved_cost
-        )
 
         print(
 
             "[BaseWorker]",
 
-            f"ReservedCost="
-            f"{reserved_cost}",
-
-            f"CurrentCost="
-            f"{self.current_reserved_cost}"
+            f"Claimed {len(tasks)} tasks",
         )
-        if not tasks:
-
-            await asyncio.sleep(
-                self.poll_interval
-            )
-
-            return
-
-        print(
-            "[BaseWorker] "
-            f"Reserved {len(tasks)} tasks"
-        )
-
-        # ==================================
-        # LOCAL EXECUTION QUEUE
-        # ==================================
 
         for task_data in tasks:
-
-            task_id = task_data["task_id"]
-
-            task_cost = task_data.get(
-                "task_cost",
-                0
-            )
-
-            self.task_costs[
-                task_id
-            ] = task_cost
-
             future = asyncio.create_task(
-
-                self.execute_with_limits(
-                    task_data
-                )
+                self.execute_with_limits(task_data)
             )
 
-            self.running_tasks.add(
-                future
-            )
+            self.inflight_tasks.add(future)
 
             future.add_done_callback(
-
-                lambda f:
-
-                self.running_tasks.discard(
-                    f
-                )
+                self.inflight_tasks.discard
             )
 
         print(
-
             "[BaseWorker]",
-
-            f"Running={len(self.running_tasks)}"
+            f"InFlight={len(self.inflight_tasks)} "
+            f"Available={self.available_slots()}"
         )
 
     # ======================================
@@ -357,28 +282,18 @@ class BaseWorker(ABC):
 
         task = None
 
-        heartbeat_task = None
-
         runtime_context = None
         try:
 
             # ==================================
             # HYDRATE ORM TASK
             # ==================================
+            if not task_data:
+                raise ValueError("Missing task payload")
 
-            serialized_task = task_data.get(
-                "task_data"
-            )
-
-            if not serialized_task:
-                raise ValueError(
-                    f"Missing task_data for task "
-                    f"{task_data.get('task_id')}"
-                )
-
-            task = TaskDto.from_dict(
-                serialized_task
-            )
+            task = TaskDto.from_dict(task_data)
+            async with self.running_tasks_lock:
+                self.running_tasks.add(str(task.id))
 
             print(
                 "[BaseWorker] "
@@ -390,18 +305,6 @@ class BaseWorker(ABC):
                 "[BaseWorker] "
                 f"Task type: "
                 f"{task.task_type}"
-            )
-
-            # ==================================
-            # START HEARTBEAT
-            # ==================================
-
-            heartbeat_task = (
-                asyncio.create_task(
-                    self.heartbeat_loop(
-                        task.id
-                    )
-                )
             )
 
             # ==================================
@@ -525,93 +428,51 @@ class BaseWorker(ABC):
 
         finally:
 
-            # ==================================
-            # STOP HEARTBEAT
-            # ==================================
-
-            if heartbeat_task:
-
-                heartbeat_task.cancel()
-
-                try:
-
-                    await heartbeat_task
-
-                except asyncio.CancelledError:
-
-                    pass
-
-            # ==================================
-            # CLEANUP WORKSPACE
-            # ==================================
-
-            if workspace_dir:
-
-                self.workspace_manager.cleanup_workspace(
-                    workspace_dir
-                )
-
             if task:
+                async with self.running_tasks_lock:
+                    self.running_tasks.discard(str(task.id))
 
-                task_cost = (
+            try:
+                if workspace_dir:
+                    self.workspace_manager.cleanup_workspace(workspace_dir)
+            except Exception:
+                traceback.print_exc()
 
-                    self.task_costs.pop(
+            try:
+                if runtime_context:
+                    await runtime_context.close()
+            except Exception:
+                traceback.print_exc()
 
-                        str(task.id),
-
-                        0
-                    )
-                )
-
-                self.current_reserved_cost -= (
-                    task_cost
-                )
-
-                if (
-                        self.current_reserved_cost < 0
-                ):
-                    self.current_reserved_cost = 0
-
-                print(
-
-                    "[BaseWorker]",
-
-                    f"ReleasedCost="
-                    f"{task_cost}",
-
-                    f"CurrentCost="
-                    f"{self.current_reserved_cost}"
-                )
-
-            if runtime_context:
-                await runtime_context.close()
     # ======================================
-    # HEARTBEAT LOOP
+    # LEASE LOOP
     # ======================================
 
-    async def heartbeat_loop(
-        self,
-        task_id
-    ):
+    async def lease_loop(self):
 
         while True:
 
             try:
-                await self.api.renew_leases(
 
-                    worker_id=
-                    self.worker_id,
+                async with self.running_tasks_lock:
+                    task_ids = list(self.running_tasks)
 
-                    task_ids=[
-                        str(task_id)
-                    ]
-                )
-                print(
-                    "[BaseWorker] "
-                    f"Lease renewed: "
-                    f"{task_id}"
-                )
-                await asyncio.sleep(10)
+                if task_ids:
+                    response = await self.api.renew_leases(
+
+                        worker_id=self.worker_id,
+
+                        task_ids=task_ids,
+                    )
+
+                    print(
+                        "[BaseWorker] "
+                        f"Lease renewed: "
+                        f"{response.get('renewed', 0)}/"
+                        f"{response.get('requested', len(task_ids))}"
+                    )
+
+                await asyncio.sleep(30)
 
             except asyncio.CancelledError:
 
@@ -621,21 +482,9 @@ class BaseWorker(ABC):
 
                 print(
                     "[BaseWorker] "
-                    f"Heartbeat error: "
+                    f"Lease loop error: "
                     f"{str(e)}"
                 )
 
                 await asyncio.sleep(5)
 
-    def get_available_capacity_cost(
-            self
-    ):
-
-        return max(
-
-            0,
-
-            self.resource_capacity.total_cost()
-
-            - self.current_reserved_cost
-        )

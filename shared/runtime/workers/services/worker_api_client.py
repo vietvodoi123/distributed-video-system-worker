@@ -125,46 +125,27 @@ class WorkerApiClient:
     # =====================================
 
     async def claim_tasks(
-        self,
-        *,
-        worker_id: str,
-        worker_type: str,
-        capabilities: list[str],
-        available_capacity_cost: float,
-        current_reserved_cost: float,
-        max_batch_size: int,
-        resource_capacity: dict,
+            self,
+            *,
+            worker_id: str,
+            worker_type: str,
+            capabilities: list[str],
+            available_slots:int
     ):
-
         payload = {
 
-            "worker_id":
-            worker_id,
+            "worker_id": worker_id,
 
-            "worker_type":
-            worker_type,
+            "worker_type": worker_type,
 
-            "capabilities":
-            capabilities,
+            "capabilities": capabilities,
 
-            "available_capacity_cost":
-            available_capacity_cost,
-
-            "current_reserved_cost":
-            current_reserved_cost,
-
-            "max_batch_size":
-            max_batch_size,
-
-            "resource_capacity":
-            resource_capacity
+            "available_slots": available_slots
         }
 
         return await self._post(
-
             "/workers/claim-tasks",
-
-            payload
+            payload,
         )
 
 
@@ -233,40 +214,38 @@ class WorkerApiClient:
             payload
         )
 
-
     # =====================================
     # RENEW LEASES
     # =====================================
 
     async def renew_leases(
-        self,
-        *,
-        worker_id: str,
-        task_ids: list[str],
-        lease_seconds: int = 300
+            self,
+            *,
+            worker_id: str,
+            task_ids: list[str],
     ):
+        """
+        Renew leases for all running tasks currently owned by this worker.
+
+        The lease duration is determined by the server.
+        Workers are only responsible for periodically proving liveness.
+        """
 
         payload = {
 
-            "worker_id":
-            worker_id,
+            "worker_id": worker_id,
 
-            "task_ids":
-            [
-                str(x)
-                for x in task_ids
-            ],
-
-            "lease_seconds":
-            lease_seconds
+            "task_ids": [
+                str(task_id)
+                for task_id in task_ids
+            ]
         }
-
 
         return await self._post(
 
             "/workers/renew-leases",
 
-            payload
+            payload,
         )
 
 

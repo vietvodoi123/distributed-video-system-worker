@@ -115,7 +115,6 @@ class GenerateTtsSegmentsExecutor(
                 f"{output_name}"
             )
 
-
             segments.append({
 
                 "line_index":
@@ -134,59 +133,10 @@ class GenerateTtsSegmentsExecutor(
                 output_path
             })
 
-
-        # =====================================
-        # MANIFEST STILL MINIO
-        # =====================================
-
-        manifest = {
-
-            "success":
-            True,
-
-            "executor":
-            self.__class__.__name__,
-
-            "stage":
-            "generate_tts_segments",
-
-            "task_group":
-            task_group,
-
-            "total_segments":
-            len(segments),
-
-            "generated_at":
-            datetime.utcnow().isoformat(),
-
-            "segments":
-            segments
-        }
-
-
-        manifest_path = (
-
-            f"{runtime_context.chapter_dir}"
-
-            f"/tts/metadata/"
-
-            f"tts_generation_manifest.json"
-        )
-
-
-        await storage.write_json(
-
-            manifest_path,
-
-            manifest
-        )
-
-
         duration = round(
             time.time() - started_at,
             2
         )
-
 
         print(
             "[GenerateTtsSegmentsExecutor]",
@@ -195,10 +145,6 @@ class GenerateTtsSegmentsExecutor(
 
 
         return {
-
-            "manifest_path":
-            manifest_path,
-
 
             "result": {
 
@@ -212,11 +158,6 @@ class GenerateTtsSegmentsExecutor(
 
                 "total_segments":
                 len(segments),
-
-
-                "duration_seconds":
-                duration,
-
 
                 "metrics": {
 
@@ -234,24 +175,3 @@ class GenerateTtsSegmentsExecutor(
             }
         }
 
-
-    def get_resource_requirements(
-        self,
-        task,
-        runtime_context
-    ):
-
-        return {
-
-            "cpu": 1,
-
-            "ram": 1,
-
-            "gpu": 0,
-
-            "network": 1,
-
-            "disk_io": 1,
-
-            "queue_pressure": 5
-        }

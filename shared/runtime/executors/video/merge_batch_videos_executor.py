@@ -3,7 +3,6 @@ import subprocess
 import time
 from datetime import datetime
 
-
 from shared.runtime.executors.base.base_task_executor import (
     BaseTaskExecutor
 )
@@ -18,18 +17,18 @@ from shared.utils.run_ffmpeg_with_progress import (
 
 from shared.runtime.contexts.batch_runtime_context import (BatchRuntimeContext)
 
+
 class MergeBatchVideosExecutor(
     BaseTaskExecutor
 ):
-
     CAPABILITIES = [
         "ffmpeg"
     ]
 
     async def execute(
-        self,
-        task,
-        runtime_context:BatchRuntimeContext,
+            self,
+            task,
+            runtime_context: BatchRuntimeContext,
     ):
 
         started_at = time.time()
@@ -38,23 +37,20 @@ class MergeBatchVideosExecutor(
             runtime_context
             .artifact_storage
         )
+        payload = task.payload
 
         # =====================================
         # LOAD CHAPTER TASKS
         # =====================================
 
-        video_paths = (
-            task.payload.get(
-                "video_paths",
-                []
-            )
+        video_paths = payload.get(
+            "video_paths"
         )
 
         if not video_paths:
             raise ValueError(
                 "No chapter videos found"
             )
-
 
         # =====================================
         # MATERIALIZE LOCAL FILES
@@ -82,7 +78,6 @@ class MergeBatchVideosExecutor(
                 )
             )
             if not local_path.exists():
-
                 raise FileNotFoundError(
                     f"Missing local video: "
                     f"{local_path}"
@@ -98,14 +93,13 @@ class MergeBatchVideosExecutor(
 
         concat_file = (
 
-            runtime_context.workspace_dir
-            / "concat.txt"
+                runtime_context.workspace_dir
+                / "concat.txt"
         )
 
         concat_lines = []
 
         for video_path in local_video_paths:
-
             safe_path = (
                 str(video_path.resolve())
                 .replace("\\", "/")
@@ -135,8 +129,8 @@ class MergeBatchVideosExecutor(
 
         local_output = (
 
-            runtime_context.workspace_dir
-            / "merged_batch.mp4"
+                runtime_context.workspace_dir
+                / "merged_batch.mp4"
         )
 
         remote_output = (
@@ -185,13 +179,11 @@ class MergeBatchVideosExecutor(
         # =====================================
 
         if not local_output.exists():
-
             raise FileNotFoundError(
                 "Merged batch video not generated"
             )
 
         if local_output.stat().st_size <= 0:
-
             raise ValueError(
                 "Merged batch video empty"
             )
@@ -213,46 +205,6 @@ class MergeBatchVideosExecutor(
             f"{remote_output}"
         )
 
-        # =====================================
-        # MANIFEST
-        # =====================================
-
-        manifest = {
-
-            "success": True,
-
-            "executor":
-            self.__class__.__name__,
-
-            "generated_at":
-            datetime.utcnow().isoformat(),
-
-            "chapter_count":
-            len(video_paths),
-
-            "output_path":
-            remote_output,
-
-            "render_time_seconds":
-            round(
-                time.time()
-                - started_at,
-                2
-            )
-        }
-
-        manifest_path = (
-
-            f"{runtime_context.batch_output_dir}"
-            f"/metadata/"
-            f"merge_batch_manifest.json"
-        )
-
-        await storage.write_json(
-            manifest_path,
-            manifest
-        )
-
         print(
             "[MergeBatchVideosExecutor] Completed"
         )
@@ -264,50 +216,5 @@ class MergeBatchVideosExecutor(
         return {
 
             "output_path":
-            remote_output,
-
-            "manifest_path":
-            manifest_path,
-
-            "result":
-            manifest
-        }
-
-    def get_resource_requirements(
-            self,
-            task,runtime_context
-    ):
-
-        chapter_count = (
-            task.payload.get(
-                "chapter_count",
-                10
-            )
-        )
-
-        factor = max(
-            1,
-            chapter_count / 10
-        )
-
-        return {
-
-            "cpu": min(
-                40,
-                10 * factor
-            ),
-
-            "ram": min(
-                32,
-                6 * factor
-            ),
-
-            "gpu": 0,
-
-            "network": 0,
-
-            "disk_io": min(
-                50,
-                15 * factor
-            )
+                remote_output,
         }

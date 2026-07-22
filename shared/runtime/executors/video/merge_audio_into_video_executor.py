@@ -16,15 +16,14 @@ from shared.runtime.contexts.chapter_runtime_context import (ChapterRuntimeConte
 class MergeAudioIntoVideoExecutor(
     BaseTaskExecutor
 ):
-
     CAPABILITIES = [
         "ffmpeg"
     ]
 
     async def execute(
-        self,
-        task,
-        runtime_context:ChapterRuntimeContext
+            self,
+            task,
+            runtime_context: ChapterRuntimeContext
     ):
 
         started_at = time.time()
@@ -40,28 +39,15 @@ class MergeAudioIntoVideoExecutor(
 
         video_input = (
 
-                task.payload.get(
-                    "video_path"
-                )
-
-                or
-
-                task.payload.get(
-                    "video_input"
-                )
+            task.payload.get(
+                "video_input"
+            )
         )
 
         audio_input = (
-
-                task.payload.get(
-                    "narration_wav_path"
-                )
-
-                or
-
-                task.payload.get(
-                    "audio_input"
-                )
+            task.payload.get(
+                "audio_input"
+            )
         )
 
         if not video_input:
@@ -103,13 +89,11 @@ class MergeAudioIntoVideoExecutor(
         # =====================================
 
         if not local_video.exists():
-
             raise FileNotFoundError(
                 f"Missing composited video: {local_video}"
             )
 
         if not local_audio.exists():
-
             raise FileNotFoundError(
                 f"Missing narration audio: {local_audio}"
             )
@@ -120,9 +104,9 @@ class MergeAudioIntoVideoExecutor(
 
         local_output = (
 
-            runtime_context
-            .workspace_dir
-            / "final.mp4"
+                runtime_context
+                .workspace_dir
+                / "final.mp4"
         )
 
         # =====================================
@@ -182,13 +166,11 @@ class MergeAudioIntoVideoExecutor(
         # =====================================
 
         if not local_output.exists():
-
             raise FileNotFoundError(
                 "Final video not generated"
             )
 
         if local_output.stat().st_size <= 0:
-
             raise ValueError(
                 "Final video empty"
             )
@@ -204,54 +186,6 @@ class MergeAudioIntoVideoExecutor(
             local_output.read_bytes()
         )
 
-        # =====================================
-        # MANIFEST
-        # =====================================
-
-        manifest = {
-
-            "success": True,
-
-            "executor":
-                self.__class__.__name__,
-
-            "generated_at":
-                datetime.utcnow().isoformat(),
-
-            "video_input":
-                video_input,
-
-            "audio_input":
-                audio_input,
-
-            "output_path":
-                final_video_path,
-
-            "video_codec":
-                "copy",
-
-            "audio_codec":
-                "aac",
-
-            "render_time_seconds":
-                round(
-                    time.time() - started_at,
-                    2
-                )
-        }
-
-        manifest_path = (
-
-            f"{runtime_context.chapter_dir}"
-            f"/video/metadata/"
-            f"merge_audio_manifest.json"
-        )
-
-        await storage.write_json(
-
-            manifest_path,
-            manifest
-        )
 
         print(
             "[MergeAudioIntoVideoExecutor] Completed"
@@ -260,11 +194,5 @@ class MergeAudioIntoVideoExecutor(
         return {
 
             "output_path":
-            final_video_path,
-
-            "manifest_path":
-            manifest_path,
-
-            "result":
-            manifest
+                final_video_path,
         }
