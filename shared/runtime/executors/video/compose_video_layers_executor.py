@@ -177,7 +177,7 @@ class ComposeVideoLayersExecutor(
                     str(local_mc_loop),
 
                     x=961,
-                    y=236,
+                    y=256,
                 )
             ],
 

@@ -273,7 +273,80 @@ def draw_episode_badge(
         stroke_fill="black",
     )
 
+import textwrap
 
+
+def fit_title(
+    draw: ImageDraw.ImageDraw,
+    title: str,
+    font_path: str,
+    start_size: int,
+    max_width: int,
+    max_height: int,
+):
+    size = start_size
+
+    while size >= 20:
+
+        main_font = load_font(font_path, size)
+        sub_font = load_font(font_path, int(size * 0.82))
+
+        words = title.split()
+
+        best_main = title
+        best_sub = ""
+
+        # tìm cách chia đẹp nhất thành đúng 2 dòng
+        if len(words) > 1:
+
+            best_score = 1e9
+
+            for i in range(1, len(words)):
+                line1 = " ".join(words[:i])
+                line2 = " ".join(words[i:])
+
+                w1 = draw.textbbox((0, 0), line1, font=main_font)[2]
+                w2 = draw.textbbox((0, 0), line2, font=sub_font)[2]
+
+                score = abs(w1 - w2)
+
+                if score < best_score:
+                    best_score = score
+                    best_main = line1
+                    best_sub = line2
+
+        main_bbox = draw.textbbox((0, 0), best_main, font=main_font)
+        sub_bbox = draw.textbbox((0, 0), best_sub, font=sub_font)
+
+        main_width = main_bbox[2] - main_bbox[0]
+        sub_width = sub_bbox[2] - sub_bbox[0]
+
+        main_height = main_bbox[3] - main_bbox[1]
+        sub_height = sub_bbox[3] - sub_bbox[1]
+
+        spacing = int(main_height * 0.35)
+
+        total_height = main_height + sub_height + spacing
+
+        if (
+            main_width <= max_width
+            and sub_width <= max_width
+            and total_height <= max_height
+        ):
+            return (
+                best_main,
+                best_sub,
+                main_font,
+                sub_font,
+                main_height,
+                sub_height,
+                spacing,
+                total_height,
+            )
+
+        size -= 2
+
+    raise RuntimeError("Cannot fit title")
 # =========================================
 # MAIN
 # =========================================
@@ -313,89 +386,28 @@ def compose_thumbnail(
     # SPLIT TITLE
     # =====================================
 
-    main_title, sub_title = (
-        split_title(title)
+    max_text_width = int(width * 0.88)  # chừa lề trái/phải
+    max_total_height = int(height * 0.36)  # khoảng 36% ảnh
+
+    main_size = int(height * 0.12)
+
+    (
+        main_title,
+        sub_title,
+        main_font,
+        sub_font,
+        main_height,
+        sub_height,
+        spacing,
+        total_height,
+    ) = fit_title(
+        draw=draw,
+        title=title,
+        font_path=font_path,
+        start_size=main_size,
+        max_width=max_text_width,
+        max_height=max_total_height,
     )
-
-    # =====================================
-    # FONT SIZES
-    # =====================================
-
-    main_size = int(
-        height * 0.12
-    )
-
-    sub_size = int(
-        main_size * 0.82
-    )
-
-    spacing = int(
-        height * 0.018
-    )
-
-    # =====================================
-    # FIT HEIGHT
-    # =====================================
-
-    max_total_height = (
-            height / 2
-    )
-
-    while True:
-
-        main_font = load_font(
-            font_path,
-            main_size
-        )
-
-        sub_font = load_font(
-            font_path,
-            sub_size
-        )
-
-        main_bbox = (
-            draw.textbbox(
-
-                (0, 0),
-
-                main_title,
-
-                font=main_font
-            )
-        )
-
-        sub_bbox = (
-            draw.textbbox(
-
-                (0, 0),
-
-                sub_title,
-
-                font=sub_font
-            )
-        )
-
-        main_height = (
-            main_bbox[3]
-            - main_bbox[1]
-        )
-
-        sub_height = (
-            sub_bbox[3]
-            - sub_bbox[1]
-        )
-
-        total_height = (
-            main_height
-            + sub_height
-            + spacing
-        )
-
-        if total_height <= max_total_height:
-            break
-
-        main_size -= 2
-        sub_size -= 2
 
     # =====================================
     # POSITION
