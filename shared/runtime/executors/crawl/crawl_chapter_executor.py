@@ -22,7 +22,7 @@ from shared.runtime.contexts.chapter_runtime_context import (
 from shared.crawler.scrape_do_engine import (
     ScrapeDoEngine
 )
-
+from shared.crawler.engine_factory import EngineFactory
 class CrawlChapterExecutor(
     BaseTaskExecutor
 ):
@@ -111,67 +111,17 @@ class CrawlChapterExecutor(
             )
 
 
-        # =========================
-        # PLAYWRIGHT
-        # =========================
-
-        elif engine_name == "playwright":
-
+        else:
 
             resolver = ChapterResolver(
-                engine=PlaywrightCrawlerEngine()
-            )
 
-
-            chapter_data = (
-                await resolver.get_chapter(
-
-                    source_url,
-
-                    css_title=css_title,
-
-                    css_content=css_content,
-
-                    css_next=css_next
-                )
-            )
-
-
-            if not chapter_data:
-
-                raise ValueError(
-                    "Resolve chapter failed"
-                )
-
-
-            title = (
-                chapter_data
-                .get(
-                    "title",
-                    ""
-                )
-                .strip()
-            )
-
-
-            content = (
-                chapter_data
-                .get(
-                    "content",
-                    ""
-                )
-                .strip()
-            )
-
-        elif engine_name == "scrape_do":
-            print(engine_name)
-            resolver = ChapterResolver(
-                engine=ScrapeDoEngine(
-                    token="cb00a7233e964b088be28a16408ce53999b8e3c8572"
+                engine=EngineFactory.create(
+                    engine_name
                 )
             )
 
             chapter_data = await resolver.get_chapter(
+
                 source_url,
 
                 css_title=css_title,
@@ -187,80 +137,17 @@ class CrawlChapterExecutor(
                 )
 
             title = (
-                chapter_data
-                .get(
+                chapter_data.get(
                     "title",
                     ""
-                )
-                .strip()
+                ).strip()
             )
 
             content = (
-                chapter_data
-                .get(
+                chapter_data.get(
                     "content",
                     ""
-                )
-                .strip()
-            )
-
-        # =========================
-        # BS4
-        # =========================
-
-        elif engine_name == "bs4":
-
-
-            resolver = ChapterResolver(
-                engine=HttpCrawlerEngine()
-            )
-
-
-            chapter_data = (
-                await resolver.get_chapter(
-
-                    source_url,
-
-                    css_title=css_title,
-
-                    css_content=css_content,
-
-                    css_next=css_next
-                )
-            )
-
-
-            if not chapter_data:
-
-                raise ValueError(
-                    "Resolve chapter failed"
-                )
-
-
-            title = (
-                chapter_data
-                .get(
-                    "title",
-                    ""
-                )
-                .strip()
-            )
-
-
-            content = (
-                chapter_data
-                .get(
-                    "content",
-                    ""
-                )
-                .strip()
-            )
-
-
-        else:
-
-            raise RuntimeError(
-                f"Unsupported engine {engine_name}"
+                ).strip()
             )
 
 

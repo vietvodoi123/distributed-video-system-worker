@@ -18,7 +18,7 @@ class BaseCrawlerEngine(ABC):
         url: str,
         **kwargs
     ) -> str:
-        pass
+        ...
 
     @abstractmethod
     async def get_json(
@@ -26,4 +26,12 @@ class BaseCrawlerEngine(ABC):
         url: str,
         **kwargs
     ) -> dict[str, Any]:
-        pass
+        ...
+
+    # @abstractmethod
+    # async def fetch_chapter(
+    #     self,
+    #     url: str,
+    #     **kwargs
+    # ) -> ChapterData:
+    #     ...

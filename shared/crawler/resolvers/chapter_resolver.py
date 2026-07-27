@@ -1,6 +1,7 @@
-from urllib.parse import urljoin
-
 from bs4 import BeautifulSoup
+from urllib.parse import urljoin, urlparse
+
+
 
 
 class ChapterResolver:
@@ -36,6 +37,21 @@ class ChapterResolver:
     # =====================================
     # TITLE
     # =====================================
+
+    def get_chapter_signature(
+            self,
+            url: str
+    ) -> tuple[str, ...]:
+
+        filename = (
+            urlparse(url)
+            .path
+            .split("/")[-1]
+            .replace(".html", "")
+        )
+
+        return tuple(filename.split("_"))
+
 
     def extract_title(
         self,
@@ -235,16 +251,12 @@ class ChapterResolver:
             # NEXT PAGE
             # ==============================
 
-            next_link = soup.select_one(
-                css_next
-            )
-
+            next_link = soup.select_one(css_next)
+            print(next_link)
             if not next_link:
                 break
 
-            href = next_link.get(
-                "href"
-            )
+            href = next_link.get("href")
 
             if not href:
                 break
@@ -255,6 +267,13 @@ class ChapterResolver:
             )
 
             if next_url in visited:
+                break
+
+            current_sig = self.get_chapter_signature(current_url)
+            next_sig = self.get_chapter_signature(next_url)
+
+            # next phải bắt đầu bằng current
+            if next_sig[:len(current_sig)] != current_sig:
                 break
 
             current_url = next_url
