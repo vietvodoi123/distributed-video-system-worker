@@ -90,8 +90,6 @@ class GenerateMcLoopExecutor(
                 "Failed to generate "
                 "mc loop video"
             )
-        size = local_output.stat().st_size
-        print("mc_loop.mp4 size: {}".format(size))
         # =====================================
         # UPLOAD
         # =====================================

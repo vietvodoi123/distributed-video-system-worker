@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 import requests
 # ====== CẤU HÌNH ======
-TASK_ID = "08a3bcc5-611f-429c-b2d7-ca3e5fec7baf"
+TASK_ID = "0bd7640a-d8c5-43ea-b3e5-ef8e43b7e1ae"
 WORKER_ID = "manual-test"
 URL = "http://localhost:8000/workers/complete-task"
 

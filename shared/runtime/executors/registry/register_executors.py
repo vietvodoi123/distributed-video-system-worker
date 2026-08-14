@@ -79,10 +79,10 @@ def register_executors():
         PREPROCESS_TEXT,
         PreprocessTextExecutor()
     )
-    # TaskExecutorRegistry.register(
-    #     TRANSLATE_TEXT,
-    #     TranslateTextExecutor()
-    # )
+    TaskExecutorRegistry.register(
+        TRANSLATE_TEXT,
+        TranslateTextExecutor()
+    )
     # TaskExecutorRegistry.register(
     #     REFINE_TEXT,
     #     RefineTextExecutor()

@@ -1,6 +1,4 @@
-import time
 
-from datetime import datetime
 from pathlib import Path
 
 from shared.runtime.executors.base.base_task_executor import (
@@ -28,7 +26,7 @@ class ComposeVideoLayersExecutor(
             task,
             runtime_context: ChapterRuntimeContext
     ):
-        started_at = time.time()
+
 
         storage = (
             runtime_context
@@ -103,9 +101,7 @@ class ComposeVideoLayersExecutor(
                 runtime_context.workspace_dir
             )
         )
-        print("MC:", local_mc_loop)
-        print("Exists:", local_mc_loop.exists())
-        print("Size:", local_mc_loop.stat().st_size)
+
         # =====================================
         # VALIDATE FILE EXISTENCE
         # =====================================

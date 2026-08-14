@@ -1,3 +1,5 @@
+import asyncio
+import random
 import requests
 
 from shared.crawler.resolvers.chapter_resolver import (
@@ -8,20 +10,11 @@ from shared.runtime.executors.base.base_task_executor import (
     BaseTaskExecutor
 )
 
-from shared.crawler.http_engine import (
-    HttpCrawlerEngine
-)
-
-from shared.crawler.playwright_engine import (
-    PlaywrightCrawlerEngine
-)
 
 from shared.runtime.contexts.chapter_runtime_context import (
     ChapterRuntimeContext
 )
-from shared.crawler.scrape_do_engine import (
-    ScrapeDoEngine
-)
+
 from shared.crawler.engine_factory import EngineFactory
 class CrawlChapterExecutor(
     BaseTaskExecutor
@@ -68,6 +61,10 @@ class CrawlChapterExecutor(
             "http"
         )
 
+        # Giả lập hành vi người dùng
+        delay = random.uniform(1.5, 4.0)
+        print(f"[CrawlChapterExecutor] Sleep {delay:.2f}s before crawling")
+        await asyncio.sleep(delay)
 
         # =========================
         # HTTP JSON
