@@ -140,21 +140,3 @@ class PreprocessTextExecutor(
         }
 
 
-    def get_resource_requirements(
-        self,
-        task,
-        runtime_context
-    ):
-
-        return {
-
-            "cpu": 1,
-
-            "ram": 1,
-
-            "gpu": 0,
-
-            "network": 1,
-
-            "disk_io": 0
-        }

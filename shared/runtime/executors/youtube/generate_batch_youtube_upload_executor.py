@@ -243,18 +243,7 @@ class GenerateBatchYoutubeUploadExecutor(
                 )[-1]
             )
 
-            try:
 
-                await storage.delete(
-                    runtime_context.batch_output_dir
-                )
-
-            except Exception as cleanup_error:
-
-                print(
-                    "[Cleanup Failed]",
-                    cleanup_error
-                )
 
             return {
 

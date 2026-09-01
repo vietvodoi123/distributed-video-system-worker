@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 import requests
 # ====== CẤU HÌNH ======
-TASK_ID = "0bd7640a-d8c5-43ea-b3e5-ef8e43b7e1ae"
+TASK_ID = "90473d9f-4abd-4b1b-8786-43058819fd82"
 WORKER_ID = "manual-test"
 URL = "http://localhost:8000/workers/complete-task"
 
@@ -21,16 +21,9 @@ payload = {
     "task_id": TASK_ID,
     "result": {
         "translated_text": text
-    },
-    "output_path": None,
-    "manifest_path": None,
-    "resource_metrics": {}
+    }
 }
 
-Path(OUTPUT_FILE).write_text(
-    json.dumps(payload, ensure_ascii=False, indent=2),
-    encoding="utf-8",
-)
 
 response = requests.post(
     URL,
