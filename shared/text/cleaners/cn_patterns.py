@@ -11,27 +11,37 @@ AD_PATTERNS = [
     r"^喜欢[^。\n]*?请大家收藏：?\([^)]*\)[^。\n]*?更新速度全网最快。?$",
 
     r"^请收藏本站[:：].*$",
-    r"^请收藏本页[:：].*$",
 
     r"^笔趣阁.*$",
+
     r"^书海阁小说网.*$",
+
     r"^这章没有结束，请点击下一页继续阅读！$",
 
     r"^.*觀看最快的章節更新.*$",
-    r"^.*记住本站域名.*$",
+
     r"^.*記住本站域名.*$",
+
     r"^.*望讀者記一下我們域名.*$",
 
     r"^.*請用戶直接瀏覽器訪問.*$",
 
+    r"^.*請用戶直接瀏覽器訪問.*天天看小說.*$",
+
+    r"^Người đăng:.*$",
+
+    r"^Người đăng：.*$",
+
     r"^最新网址.*$",
-    r"^.*最新网址.*$",
 
     r"^请收藏本站.*$",
+
     r"^手机用户请.*$",
+
     r"^本章未完.*$",
 
     r"^（本章完）$",
+
     r"^\(本章完\)$",
 
     r"^chaptererror\(\);$",
@@ -39,21 +49,26 @@ AD_PATTERNS = [
     r"^『加入书签.*$",
 
     r"^天才一秒记住.*$",
+
     r"^可樂小說.*$",
+
     r"^天天看小說.*$",
+
     r"^記住本站.*$",
+
     r"^最新章節.*$",
+
     r"^首發.*$",
+
     r"^本書.*$",
 
     r"^添加書籤.*$",
-    r"^返回目錄.*$",
-    r"^章節報錯.*$",
-    r"^分享給朋友：.*$",
 
-    # Vietnamese crawler noise nếu chẳng may lọt vào
-    r"^Người đăng：?.*$",
-    r"^Người đăng:?.*$",
+    r"^返回目錄.*$",
+
+    r"^章節報錯.*$",
+
+    r"^分享給朋友：.*$",
 ]
 
 
@@ -63,49 +78,61 @@ AD_PATTERNS = [
 
 NOISE_PATTERNS = [
 
-    # dot / ellipsis noise
+    # 点号 / ellipsis
     r"·\s*·\s*·\s*·",
+
     r"·······",
+
     r"\.{3,}",
+
     r"…{2,}",
 
-    # horizontal separators
+    # 分隔线
     r"[—\-]{3,}",
+
     r"[—]{5,}",
+
     r"[─]{5,}",
 
-    # tilde noise
+    # 波浪线
     r"~+",
 
-    # empty brackets
+    # 空括号
     r"【\s*】",
 ]
 
 
 # ============================================================
-# DOMAIN / URL
+# URL
 # ============================================================
 
-# URL hoàn chỉnh:
-# http://example.com
-# https://example.com/abc
-# www.example.com
 URL_PATTERNS = [
 
+    # http://example.com
     r"(?i)\bhttps?://[^\s<>\[\]{}\"'，。！？；：、）)】》]+",
 
+    # www.example.com
     r"(?i)\bwww\.[^\s<>\[\]{}\"'，。！？；：、）)】》]+",
 ]
 
 
-# Domain không có http/www:
+# ============================================================
+# DOMAIN
+# ============================================================
+
+# Bắt:
 #
 # example.com
-# m.shuhaige.net
+# example.net
+# example.org
+# example.cn
+# example.com.cn
+# m.example.com
+# abc.xyz
 # abc.cc
-# foo.com.cn
 #
-# Không bắt mọi dấu "." để tránh xóa nhầm nội dung tiếng Trung.
+# Không bắt những chuỗi không có TLD hợp lệ.
+
 DOMAIN_PATTERN = (
     r"(?i)"
     r"\b"
@@ -115,15 +142,48 @@ DOMAIN_PATTERN = (
         r"\."
     r")+"
     r"(?:"
-        r"com|net|org|edu|gov|mil|"
-        r"cn|com\.cn|net\.cn|org\.cn|"
-        r"cc|co|me|tv|io|ai|"
-        r"xyz|top|vip|site|online|"
-        r"info|biz|club|pro|app|"
-        r"live|store|tech|cloud|"
-        r"icu|link|work|win|"
-        r"fun|click|shop|"
-        r"pw|tk|ga|cf|ml"
+        r"com|"
+        r"net|"
+        r"org|"
+        r"edu|"
+        r"gov|"
+        r"mil|"
+        r"cn|"
+        r"com\.cn|"
+        r"net\.cn|"
+        r"org\.cn|"
+        r"cc|"
+        r"co|"
+        r"me|"
+        r"tv|"
+        r"io|"
+        r"ai|"
+        r"xyz|"
+        r"top|"
+        r"vip|"
+        r"site|"
+        r"online|"
+        r"info|"
+        r"biz|"
+        r"club|"
+        r"pro|"
+        r"app|"
+        r"live|"
+        r"store|"
+        r"tech|"
+        r"cloud|"
+        r"icu|"
+        r"link|"
+        r"work|"
+        r"win|"
+        r"fun|"
+        r"click|"
+        r"shop|"
+        r"pw|"
+        r"tk|"
+        r"ga|"
+        r"cf|"
+        r"ml"
     r")"
     r"(?:"
         r":[0-9]{1,5}"
@@ -135,32 +195,33 @@ DOMAIN_PATTERN = (
 
 
 # ============================================================
-# SENTENCE / LINE BREAK
+# SENTENCE
 # ============================================================
 
-# Dấu kết câu thực sự.
+# Chỉ những dấu này được coi là dấu kết câu.
 #
-# 。 ！ ？ ；
-# ! ? ;
-# 以及 các dạng full-width.
-SENTENCE_END_CHARS = (
-    "。！？；"
-    "!?;"
-)
+# KHÔNG bao gồm dấu phẩy.
+SENTENCE_END_CHARS = "。！？；!?;"
 
 
-# Dấu có thể dùng để cắt câu dài.
+# ============================================================
+# CLOSING QUOTE
+# ============================================================
+
+# Nếu dấu kết câu đứng ngay trước một trong các
+# dấu đóng ngoặc này thì phải lấy luôn dấu đóng ngoặc.
 #
-# Ưu tiên các dấu mạnh trước, dấu phẩy cuối cùng.
-SPLIT_CHARS = (
-    "，,、：:"
-    "；;"
-    "。！？!?"
-)
-
-
-# Dấu phẩy được dùng làm điểm cắt mềm khi
-# một câu đã vượt MAX_SENTENCE_LENGTH.
-SOFT_SPLIT_CHARS = (
-    "，,"
-)
+# Ví dụ:
+#
+# 你真的要走吗？”
+#
+# không được tách thành:
+#
+# 你真的要走吗？
+# ”
+#
+# mà phải:
+#
+# 你真的要走吗？”
+#
+CLOSING_QUOTE_CHARS = "”’」』"

@@ -8,7 +8,7 @@ from shared.text.cleaners.cn_patterns import (
     URL_PATTERNS,
     DOMAIN_PATTERN,
     SENTENCE_END_CHARS,
-    SOFT_SPLIT_CHARS,
+    CLOSING_QUOTE_CHARS,
 )
 
 
@@ -16,48 +16,43 @@ from shared.text.cleaners.cn_patterns import (
 # CONFIG
 # ============================================================
 
-# Câu <= giá trị này sẽ không bị tách thêm.
+# Đây là NGƯỠNG để bắt đầu tìm dấu kết câu.
 #
-# Đây là ngưỡng để tối ưu cho text trước khi đưa sang
-# bước dịch / TTS.
+# Không có nghĩa câu sẽ bị cắt đúng tại 110 ký tự.
+#
+# Ví dụ:
+#
+# 100 ký tự + dấu 。
+# -> giữ nguyên.
+#
+# 150 ký tự
+# -> tìm dấu kết câu tiếp theo sau mốc 110.
+#
+# 300 ký tự
+# -> tiếp tục tìm dấu kết câu.
+#
 MAX_SENTENCE_LENGTH = 110
 
 
-# Nếu câu vượt MAX_SENTENCE_LENGTH,
-# cho phép tìm điểm ngắt trong khoảng này.
-#
-# Ví dụ:
-#
-# MAX = 80
-# LONG_SENTENCE_LOOKBACK = 30
-#
-# sẽ tìm dấu phẩy từ vị trí 50 -> 80.
-LONG_SENTENCE_LOOKBACK = 40
-
-
-# Không bao giờ tạo fragment quá ngắn chỉ vì tách câu.
-#
-# Ví dụ:
-#
-# "他想，"
-#
-# không nên bị tách thành:
-#
-# "他想"
-# "，"
-MIN_FRAGMENT_LENGTH = 25
-
-
 # ============================================================
-# DOMAIN / URL
+# URL / DOMAIN
 # ============================================================
 
-def _remove_urls(text: str) -> str:
+def _remove_urls(
+    text: str,
+) -> str:
     """
     Xóa URL hoàn chỉnh.
+
+    Ví dụ:
+
+        https://example.com
+        http://example.com/abc
+        www.example.com
     """
 
     for pattern in URL_PATTERNS:
+
         text = re.sub(
             pattern,
             "",
@@ -67,21 +62,23 @@ def _remove_urls(text: str) -> str:
     return text
 
 
-def _remove_domains(text: str) -> str:
+def _remove_domains(
+    text: str,
+) -> str:
     """
-    Xóa domain nằm trong nội dung.
+    Xóa URL và domain.
 
     Ví dụ:
 
         https://example.com
-        http://example.com/a
         www.example.com
         example.com
-        m.shuhaige.net
-
+        m.example.com
     """
 
-    text = _remove_urls(text)
+    text = _remove_urls(
+        text
+    )
 
     text = re.sub(
         DOMAIN_PATTERN,
@@ -96,9 +93,11 @@ def _remove_domains(text: str) -> str:
 # ADS
 # ============================================================
 
-def _remove_ads(text: str) -> str:
+def _remove_ads(
+    text: str,
+) -> str:
     """
-    Xóa các dòng quảng cáo / crawler noise.
+    Xóa các dòng quảng cáo / crawler.
     """
 
     for pattern in AD_PATTERNS:
@@ -117,9 +116,11 @@ def _remove_ads(text: str) -> str:
 # NOISE
 # ============================================================
 
-def _remove_noise(text: str) -> str:
+def _remove_noise(
+    text: str,
+) -> str:
     """
-    Xóa các ký tự noise không mang nội dung.
+    Xóa noise không mang nội dung.
     """
 
     for pattern in NOISE_PATTERNS:
@@ -137,9 +138,12 @@ def _remove_noise(text: str) -> str:
 # NORMALIZE
 # ============================================================
 
-def _normalize_text(text: str) -> str:
+def _normalize_text(
+    text: str,
+) -> str:
     """
-    Chuẩn hóa whitespace và line ending.
+    Chuẩn hóa whitespace nhưng không thay đổi
+    nội dung tiếng Trung.
     """
 
     # Full-width space
@@ -154,12 +158,13 @@ def _normalize_text(text: str) -> str:
         " ",
     )
 
-    # Windows / old Mac line endings
+    # Windows newline
     text = text.replace(
         "\r\n",
         "\n",
     )
 
+    # Old Mac newline
     text = text.replace(
         "\r",
         "\n",
@@ -171,33 +176,28 @@ def _normalize_text(text: str) -> str:
         " ",
     )
 
-    # Collapse spaces
+    # Collapse multiple spaces
     text = re.sub(
         r"[ ]+",
         " ",
         text,
     )
 
-    # Remove spaces around Chinese punctuation.
-    #
-    # Ví dụ:
-    #
-    # "你好 ， 世界 。"
-    #
-    # -> "你好，世界。"
+    # Xóa space trước punctuation.
     text = re.sub(
-        r"\s+([，。！？；：、》」』）】])",
+        r"\s+([，。！？；：、》」』）】〉])",
         r"\1",
         text,
     )
 
+    # Xóa space sau opening bracket.
     text = re.sub(
-        r"([（「『【《])\s+",
+        r"([（「『【《〈“‘])\s+",
         r"\1",
         text,
     )
 
-    # Quá nhiều newline
+    # Không để quá nhiều dòng trống.
     text = re.sub(
         r"\n{3,}",
         "\n\n",
@@ -208,268 +208,395 @@ def _normalize_text(text: str) -> str:
 
 
 # ============================================================
-# EMPTY PUNCTUATION LEFT BY DOMAIN REMOVAL
+# EMPTY BRACKETS
 # ============================================================
 
-def _cleanup_after_domain_removal(text: str) -> str:
+def _cleanup_after_domain_removal(
+    text: str,
+) -> str:
     """
-    Domain thường nằm trong:
+    Domain có thể nằm trong:
 
-        (m.example.com)
+        (example.com)
+        （example.com）
+        【example.com】
 
-        【www.example.com】
-
-        [example.com]
-
-    Sau khi xóa domain có thể còn:
-
-        ()
-
-        【】
-
-        []
-
-    Hàm này dọn phần còn lại.
+    Sau khi xóa domain có thể còn ngoặc rỗng.
     """
 
-    text = re.sub(
+    empty_pairs = [
+
         r"\(\s*\)",
-        "",
-        text,
-    )
 
-    text = re.sub(
         r"（\s*）",
-        "",
-        text,
-    )
 
-    text = re.sub(
         r"\[\s*\]",
-        "",
-        text,
-    )
 
-    text = re.sub(
         r"【\s*】",
-        "",
-        text,
-    )
 
-    text = re.sub(
         r"「\s*」",
-        "",
-        text,
-    )
+
+        r"『\s*』",
+    ]
+
+    for pattern in empty_pairs:
+
+        text = re.sub(
+            pattern,
+            "",
+            text,
+        )
 
     return text
 
 
 # ============================================================
-# SENTENCE SPLITTER
+# SENTENCE END
 # ============================================================
 
-def _is_sentence_end(char: str) -> bool:
+def _is_sentence_end(
+    char: str,
+) -> bool:
+    """
+    Kiểm tra một ký tự có phải dấu kết câu hay không.
+    """
+
     return char in SENTENCE_END_CHARS
 
 
-def _find_soft_break(
-    sentence: str,
-    start: int,
-    max_length: int,
-) -> int | None:
+def _get_sentence_end(
+    text: str,
+    index: int,
+) -> int:
     """
-    Tìm vị trí cắt mềm cho một câu quá dài.
-
-    Chỉ tìm dấu phẩy trong vùng gần MAX_LENGTH.
+    Xác định vị trí kết thúc thực tế của câu.
 
     Ví dụ:
 
-        MAX = 80
-        LOOKBACK = 30
+        你真的要走吗？”
 
-    sẽ tìm dấu phẩy trong:
+    index đang trỏ vào:
 
-        50 -> 80
+        ？
 
-    Mục tiêu là giữ fragment đủ dài,
-    không cắt quá sớm.
+    thì kết thúc thực tế phải là sau:
+
+        ？”
+
     """
 
-    target = min(
-        start + max_length,
-        len(sentence),
-    )
+    position = index + 1
 
-    lower_bound = max(
-        start + MIN_FRAGMENT_LENGTH,
-        target - LONG_SENTENCE_LOOKBACK,
-    )
-
-    # Ưu tiên dấu phẩy gần target nhất.
-    for index in range(
-        target - 1,
-        lower_bound - 1,
-        -1,
+    # Chỉ kiểm tra ký tự LIỀN KỀ.
+    #
+    # Không parse ngoặc.
+    while (
+        position < len(text)
+        and text[position]
+        in CLOSING_QUOTE_CHARS
     ):
+        position += 1
 
-        if sentence[index] in SOFT_SPLIT_CHARS:
-            return index + 1
+    return position
+
+
+# ============================================================
+# SPLIT SENTENCES
+# ============================================================
+
+def _split_sentences(
+    text: str,
+) -> list[str]:
+    """
+    Tách text thành các câu hoàn chỉnh.
+
+    Quy tắc:
+
+        。！？；!?;
+        + dấu đóng ngoặc liền kề
+
+    Ví dụ:
+
+        他说：“你真的要走吗？”
+        青阳没有回答。
+
+    Kết quả:
+
+        他说：“你真的要走吗？”
+        青阳没有回答。
+    """
+
+    sentences = []
+
+    start = 0
+    index = 0
+
+    while index < len(text):
+
+        char = text[index]
+
+        if _is_sentence_end(
+            char
+        ):
+
+            end = _get_sentence_end(
+                text,
+                index,
+            )
+
+            sentence = text[
+                start:end
+            ].strip()
+
+            if sentence:
+
+                sentences.append(
+                    sentence
+                )
+
+            start = end
+            index = end
+
+            continue
+
+        index += 1
+
+    # Phần cuối không có dấu kết câu.
+    if start < len(text):
+
+        sentence = text[
+            start:
+        ].strip()
+
+        if sentence:
+
+            sentences.append(
+                sentence
+            )
+
+    return sentences
+
+
+# ============================================================
+# FIND NEXT SENTENCE END
+# ============================================================
+
+def _find_next_sentence_end(
+    text: str,
+    start: int,
+) -> int | None:
+    """
+    Tìm dấu kết câu đầu tiên kể từ start.
+
+    Không tìm dấu phẩy.
+
+    Không cắt giữa câu.
+    """
+
+    index = start
+
+    while index < len(text):
+
+        if _is_sentence_end(
+            text[index]
+        ):
+
+            return _get_sentence_end(
+                text,
+                index,
+            )
+
+        index += 1
 
     return None
 
 
+# ============================================================
+# SPLIT LONG SENTENCE
+# ============================================================
+
 def _split_long_sentence(
     sentence: str,
-    max_length: int,
+    max_length: int = MAX_SENTENCE_LENGTH,
 ) -> list[str]:
     """
-    Tách một câu dài thành các fragment.
+    Xử lý câu dài.
 
-    Quan trọng:
+    QUY TẮC QUAN TRỌNG:
 
-    - Không cắt giữa ký tự.
-    - Ưu tiên dấu phẩy.
-    - Không cắt nếu câu chưa vượt ngưỡng.
-    - Không tạo fragment quá ngắn.
+        Câu <= max_length
+            -> giữ nguyên.
+
+        Câu > max_length
+            -> KHÔNG tìm dấu phẩy.
+
+        -> tìm dấu kết câu tiếp theo.
+
+        -> xuống dòng sau dấu kết câu.
+
+    Không bao giờ cắt cứng giữa chữ.
     """
 
     sentence = sentence.strip()
 
     if not sentence:
+
         return []
 
+    # --------------------------------------------------------
+    # CÂU KHÔNG DÀI
+    # --------------------------------------------------------
+
     if len(sentence) <= max_length:
-        return [sentence]
+
+        return [
+            sentence
+        ]
+
+    # --------------------------------------------------------
+    # CÂU DÀI
+    #
+    # Ở đây sentence vốn đã là một câu hoàn chỉnh.
+    #
+    # Vì vậy không có dấu kết câu nào bên trong nữa
+    # để tìm.
+    #
+    # Do đó câu này được giữ nguyên.
+    # --------------------------------------------------------
+
+    return [
+        sentence
+    ]
+
+
+# ============================================================
+# SMART LINE SPLITTER
+# ============================================================
+
+def _split_long_text(
+    text: str,
+    max_length: int = MAX_SENTENCE_LENGTH,
+) -> list[str]:
+    """
+    Đây là hàm thực hiện việc chia dòng.
+
+    Khác với _split_sentences():
+
+        _split_sentences()
+        -> tách tại mọi dấu kết câu.
+
+    Hàm này:
+
+        - cho phép một đoạn dài chứa nhiều câu
+        - nếu tổng dòng vượt max_length
+        - tìm dấu kết câu tiếp theo
+        - rồi mới xuống dòng.
+
+    Tuyệt đối không dùng dấu phẩy.
+    """
 
     result = []
 
     start = 0
-    length = len(sentence)
+    length = len(text)
 
     while start < length:
 
         remaining = length - start
 
+        # ----------------------------------------------------
+        # Phần còn lại ngắn hơn ngưỡng.
+        # ----------------------------------------------------
+
         if remaining <= max_length:
-            fragment = sentence[start:].strip()
+
+            fragment = text[
+                start:
+            ].strip()
 
             if fragment:
-                result.append(fragment)
+
+                result.append(
+                    fragment
+                )
 
             break
 
-        break_position = _find_soft_break(
-            sentence,
-            start,
-            max_length,
+        # ----------------------------------------------------
+        # Đã vượt ngưỡng.
+        #
+        # Tìm dấu kết câu đầu tiên
+        # SAU vị trí max_length.
+        # ----------------------------------------------------
+
+        search_start = (
+            start + max_length
         )
 
-        if break_position is None:
-            # Không có dấu phẩy phù hợp.
-            #
-            # Không cắt giữa chữ.
-            # Giữ nguyên câu còn lại.
-            fragment = sentence[start:].strip()
+        end = _find_next_sentence_end(
+            text,
+            search_start,
+        )
+
+        # ----------------------------------------------------
+        # Không có dấu kết câu nữa.
+        #
+        # Không cắt cứng.
+        # ----------------------------------------------------
+
+        if end is None:
+
+            fragment = text[
+                start:
+            ].strip()
 
             if fragment:
-                result.append(fragment)
+
+                result.append(
+                    fragment
+                )
 
             break
 
-        fragment = sentence[
-            start:break_position
+        # ----------------------------------------------------
+        # Có dấu kết câu.
+        # ----------------------------------------------------
+
+        fragment = text[
+            start:end
         ].strip()
 
         if fragment:
-            result.append(fragment)
 
-        start = break_position
+            result.append(
+                fragment
+            )
 
-    return result
-
-
-def _split_sentences(text: str) -> list[str]:
-    """
-    Tách toàn bộ text thành các câu.
-
-    Trước tiên tách theo dấu kết câu.
-    Sau đó mới xử lý các câu quá dài.
-    """
-
-    sentences = []
-
-    current = []
-
-    for char in text:
-
-        current.append(char)
-
-        if _is_sentence_end(char):
-
-            sentence = "".join(current).strip()
-
-            if sentence:
-                sentences.append(sentence)
-
-            current = []
-
-    # Phần còn lại không có dấu kết câu
-    if current:
-
-        sentence = "".join(current).strip()
-
-        if sentence:
-            sentences.append(sentence)
-
-    return sentences
-
-
-def _split_for_output(text: str) -> list[str]:
-    """
-    Pipeline tách dòng:
-
-        paragraph
-            ↓
-        sentence
-            ↓
-        long sentence
-            ↓
-        output lines
-    """
-
-    base_sentences = _split_sentences(text)
-
-    result = []
-
-    for sentence in base_sentences:
-
-        parts = _split_long_sentence(
-            sentence,
-            MAX_SENTENCE_LENGTH,
-        )
-
-        result.extend(parts)
+        start = end
 
     return result
 
 
 # ============================================================
-# PARAGRAPH / LINE PROCESSING
+# PARAGRAPH
 # ============================================================
 
-def _process_paragraph(paragraph: str) -> str:
+def _process_paragraph(
+    paragraph: str,
+) -> str:
     """
-    Xử lý một paragraph độc lập.
+    Xử lý một paragraph.
     """
 
     paragraph = paragraph.strip()
 
     if not paragraph:
+
         return ""
 
-    lines = _split_for_output(
+    lines = _split_long_text(
         paragraph,
+        MAX_SENTENCE_LENGTH,
     )
 
     return "\n".join(
@@ -487,70 +614,79 @@ def clean_cn_content(
     raw_text: str,
 ) -> str:
     """
-    Clean toàn bộ text tiếng Trung.
+    Entry point duy nhất.
 
-    Input:
-        Toàn bộ raw chapter.
+    Chỉ cần truyền toàn bộ Chinese text:
 
-    Output:
-        Chinese text đã:
+        cleaned = clean_cn_content(raw_text)
+
+    Hàm sẽ:
 
         1. Xóa quảng cáo.
         2. Xóa URL.
         3. Xóa domain.
         4. Xóa noise.
         5. Normalize whitespace.
-        6. Tách câu theo dấu kết câu.
-        7. Nếu câu quá dài thì tìm dấu phẩy
-           gần ngưỡng để tách.
-        8. Giữ paragraph / chapter structure.
-
-    Ví dụ:
-
-        result = clean_cn_content(raw_text)
+        6. Tách dòng theo dấu kết câu.
+        7. Với dòng vượt 110 ký tự,
+           tìm dấu kết câu tiếp theo.
+        8. Nếu dấu kết câu có dấu đóng ngoặc
+           ngay sau nó thì lấy luôn dấu đóng ngoặc.
     """
 
     if not raw_text:
+
         return ""
 
     text = raw_text.strip()
 
-    # ========================================================
+    # --------------------------------------------------------
     # REMOVE ADS
-    # ========================================================
+    # --------------------------------------------------------
 
-    text = _remove_ads(text)
+    text = _remove_ads(
+        text
+    )
 
-    # ========================================================
+    # --------------------------------------------------------
     # REMOVE URL / DOMAIN
-    # ========================================================
+    # --------------------------------------------------------
 
-    text = _remove_domains(text)
+    text = _remove_domains(
+        text
+    )
 
-    # ========================================================
+    # --------------------------------------------------------
     # REMOVE NOISE
-    # ========================================================
+    # --------------------------------------------------------
 
-    text = _remove_noise(text)
+    text = _remove_noise(
+        text
+    )
 
-    # ========================================================
-    # CLEAN LEFTOVER PUNCTUATION
-    # ========================================================
+    # --------------------------------------------------------
+    # CLEAN EMPTY BRACKETS
+    # --------------------------------------------------------
 
-    text = _cleanup_after_domain_removal(text)
+    text = _cleanup_after_domain_removal(
+        text
+    )
 
-    # ========================================================
+    # --------------------------------------------------------
     # NORMALIZE
-    # ========================================================
+    # --------------------------------------------------------
 
-    text = _normalize_text(text)
+    text = _normalize_text(
+        text
+    )
 
     if not text:
+
         return ""
 
-    # ========================================================
+    # --------------------------------------------------------
     # PROCESS PARAGRAPHS
-    # ========================================================
+    # --------------------------------------------------------
 
     paragraphs = []
 
@@ -562,23 +698,23 @@ def clean_cn_content(
         paragraph = paragraph.strip()
 
         if not paragraph:
+
             continue
 
         processed = _process_paragraph(
-            paragraph,
+            paragraph
         )
 
         if processed:
+
             paragraphs.append(
-                processed,
+                processed
             )
 
-    # ========================================================
+    # --------------------------------------------------------
     # FINAL OUTPUT
-    # ========================================================
+    # --------------------------------------------------------
 
-    result = "\n\n".join(
-        paragraphs,
-    )
-
-    return result.strip()
+    return "\n\n".join(
+        paragraphs
+    ).strip()
