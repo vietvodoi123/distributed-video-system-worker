@@ -1,18 +1,18 @@
-MINI_PC_CAPABILITIES = [
 
-    "cpu",
-    "ffmpeg"
-]
+ANDROID_LINE_TASK = "android_line_task"
 
-MAIN_PC_CAPABILITIES = [
+CRAWL_CHAPTER_C = "crawl_chapter"
 
-    "cpu",
+PREPROCESS_TEXT_C = "preprocess_text"
 
-    "ffmpeg",
+TRANSLATE_MOXHI="translate_moxhi"
 
-    "gpu",
+MERGE_TTS_SEGMENTS_C='merge_tts_segments'
 
-    "local_llm"
-]
+VIDEO_C='video'
 
-ANDROID_TTS = "ANDROID_TTS"
+MERGE_BATCH_VIDEO_C='merge_batch_video'
+
+GENERATE_YOUTUBE_DESCRIPTION_C='generate_youtube_description'
+
+GENERATE_BATCH_THUMBNAIL_C='generate_thumbnail'

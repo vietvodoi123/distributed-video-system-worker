@@ -25,7 +25,6 @@ class CrawlChapterExecutor(
         task,
         runtime_context: ChapterRuntimeContext
     ):
-        print(task)
         payload = task.payload or {}
 
         source_url = payload.get(
@@ -63,7 +62,6 @@ class CrawlChapterExecutor(
 
         # Giả lập hành vi người dùng
         delay = random.uniform(1.5, 4.0)
-        print(f"[CrawlChapterExecutor] Sleep {delay:.2f}s before crawling")
         await asyncio.sleep(delay)
 
         # =========================

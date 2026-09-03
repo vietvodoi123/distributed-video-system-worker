@@ -32,3 +32,4 @@ GENERATE_BATCH_YOUTUBE_UPLOAD="youtube_upload"
 
 GENERATE_LINE_TASK = "generate_line_task"
 
+VIDEO ='video'

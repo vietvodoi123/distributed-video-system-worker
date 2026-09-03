@@ -7,9 +7,9 @@ def compress_thumbnail(
 
     input_path: Path,
 
-    max_size_mb: float = 4.0,
+    max_size_mb: float = 40.0,
 
-    min_quality: int = 80,
+    min_quality: int = 90,
 ) -> Path:
 
     input_path = Path(

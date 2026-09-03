@@ -47,28 +47,17 @@ from shared.runtime.executors.video.merge_batch_videos_executor import (
 from shared.runtime.executors.video.generate_batch_thumbnail_executor import (
     GenerateBatchThumbnailExecutor
 )
+from shared.runtime.executors.video.generate_video_executor import (
+    GenerateVideoExecutor
+)
 from shared.runtime.executors.youtube.generate_batch_youtube_upload_executor import (
     GenerateBatchYoutubeUploadExecutor
 )
 from shared.runtime.executors.task_line.generate_task_line_executor import (
     GenerateLineTaskExecutor
 )
-from shared.contracts.enums.task_types import (
-    CRAWL_CHAPTER,
-    PREPROCESS_TEXT,
-    TRANSLATE_TEXT,
-    REFINE_TEXT,
-    GENERATE_TTS_SEGMENTS,
-    MERGE_TTS_SEGMENTS,
-    TEXT_SCROLL_LOOP,
-    MC_LOOP,RENDER_TEMPLATE,
-    COMPOSE_VIDEO_LAYERS,
-    MERGE_AUDIO_INTO_VIDEO,
-    GENERATE_YOUTUBE_DESCRIPTION,
-    MERGE_BATCH_VIDEO,
-    GENERATE_BATCH_THUMBNAIL,
-    GENERATE_BATCH_YOUTUBE_UPLOAD,GENERATE_LINE_TASK
-)
+from shared.contracts.enums.task_types import *
+
 def register_executors():
 
     TaskExecutorRegistry.register(
@@ -122,6 +111,10 @@ def register_executors():
     TaskExecutorRegistry.register(
         MERGE_BATCH_VIDEO,
         MergeBatchVideosExecutor()
+    )
+    TaskExecutorRegistry.register(
+        VIDEO,
+        GenerateVideoExecutor()
     )
     TaskExecutorRegistry.register(
         GENERATE_BATCH_THUMBNAIL,
