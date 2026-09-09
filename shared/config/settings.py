@@ -52,6 +52,9 @@ class OpenAiSetting(BaseModel):
 class TranslationSetting(BaseModel):
     chunk_max_chars: int
 
+class ttsSetting(BaseModel):
+    tts_model: str
+
 class Settings(BaseModel):
     minio: MinioSettings
     worker: WorkerSettings
@@ -63,6 +66,7 @@ class Settings(BaseModel):
     open_ai: OpenAiSetting
     capabilities: list[str]
     translation: TranslationSetting
+    tts: ttsSetting
 
     @classmethod
     def load(cls, path: str | Path):

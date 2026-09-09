@@ -17,6 +17,15 @@ def get_batch_output_dir(
         f"batches/{batch_id}"
     )
 
+def get_tts_model(path: str) -> str:
+    project_root = get_project_root()
+
+    return f"{project_root}/shared/{path}"
+
+def get_tts_model_config(path: str) -> str:
+    project_root = get_project_root()
+
+    return f"{project_root}/shared/{path}.json"
 
 def get_batch_manifest_path(
     batch_id:str
