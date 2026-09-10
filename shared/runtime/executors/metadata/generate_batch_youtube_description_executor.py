@@ -84,15 +84,11 @@ class GenerateBatchYoutubeDescriptionExecutor(
         # TIMELINE
         # ================================
         description = (
-
             f"Tên truyện: "
             f"{title}\n\n"
 
             f"Mô tả:\n"
             f"{description}\n\n"
-
-            f"Mục lục:\n"
-            f"{timeline}\n\n"
 
             f"Danh sách phát:\n"
             f"{playlist_url}\n\n"
@@ -103,6 +99,9 @@ class GenerateBatchYoutubeDescriptionExecutor(
             f"Đăng ký kênh:\n"
             f"https://www.youtube.com/"
             f"{youtube_channel_id}"
+            
+            f"Mục lục:\n"
+            f"{timeline}\n\n"
         )
 
         output_path = (
