@@ -40,6 +40,7 @@ class ChapterRuntimeContext(
             chapter_id,
             chapter_number,
             api_client=None,
+            gpu_available=False,
     ):
 
         super().__init__(
@@ -48,6 +49,7 @@ class ChapterRuntimeContext(
             workspace_dir=workspace_dir,
             artifact_storage=artifact_storage,
             api_client=api_client,
+            gpu_available=gpu_available,
         )
 
         self.batch_id = batch_id

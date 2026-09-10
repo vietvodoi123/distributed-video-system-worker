@@ -1,73 +1,44 @@
-import subprocess
 
+import subprocess
 from pathlib import Path
 
 
 def create_video_from_concat(
-
     concat_file: str,
-
     output_file: str,
-
     fps: int = 8,
-
     codec: str = "libx264",
-
     preset: str = "medium",
-
     crf: int = 18,
+    use_gpu: bool = False,
 ):
-
     """
-    Render MP4 video from FFmpeg concat.txt
+    Render MP4 video from FFmpeg concat.txt.
 
-    Args:
-        concat_file:
-            FFmpeg concat demuxer file
+    Khi use_gpu=True:
+        Sử dụng NVIDIA NVENC (h264_nvenc) để encode video.
 
-        output_file:
-            Final output video path
-
-        fps:
-            Output FPS
-
-        codec:
-            Video codec
-
-        preset:
-            FFmpeg preset
-
-        crf:
-            Video quality
+    Khi use_gpu=False:
+        Giữ nguyên libx264 như behavior hiện tại.
     """
 
-    concat_file = Path(
-        concat_file
-    )
-
-    output_file = Path(
-        output_file
-    )
+    concat_file = Path(concat_file)
+    output_file = Path(output_file)
 
     # =====================================
     # VALIDATE
     # =====================================
 
     if not concat_file.exists():
-
         raise FileNotFoundError(
-            f"Concat file not found: "
-            f"{concat_file}"
+            f"Concat file not found: {concat_file}"
         )
 
-    concat_content = (
-        concat_file.read_text(
-            encoding="utf-8"
-        ).strip()
-    )
+    concat_content = concat_file.read_text(
+        encoding="utf-8"
+    ).strip()
 
     if not concat_content:
-
         raise ValueError(
             "Concat file is empty"
         )
@@ -82,9 +53,7 @@ def create_video_from_concat(
     # =====================================
 
     cmd = [
-
         "ffmpeg",
-
         "-y",
 
         # ================================
@@ -98,9 +67,7 @@ def create_video_from_concat(
         "0",
 
         "-i",
-        str(
-            concat_file.resolve()
-        ),
+        str(concat_file.resolve()),
 
         # ================================
         # VIDEO
@@ -111,21 +78,66 @@ def create_video_from_concat(
 
         "-pix_fmt",
         "yuv420p",
+    ]
 
+    # =====================================
+    # VIDEO ENCODER
+    # =====================================
 
-        "-c:v",
-        codec,
+    if use_gpu:
 
-        "-preset",
-        preset,
+        # NVIDIA NVENC
+        cmd += [
+            "-c:v",
+            "h264_nvenc",
 
-        "-crf",
-        str(crf),
+            # NVENC preset:
+            # p1 = fastest
+            # p4 = balanced
+            # p5 = better quality
+            "-preset",
+            "p4",
 
-        # ================================
-        # FASTSTART
-        # ================================
+            "-pix_fmt",
+            "yuv420p",
 
+            # Constant quality mode
+            "-rc",
+            "vbr",
+
+            "-cq",
+            str(crf),
+
+            # Giới hạn bitrate để tránh bitrate tăng quá cao
+            "-b:v",
+            "4M",
+
+            "-maxrate",
+            "6M",
+
+            "-bufsize",
+            "12M",
+        ]
+
+    else:
+
+        # CPU / libx264
+        cmd += [
+            "-c:v",
+            codec,
+
+            "-preset",
+            preset,
+
+            "-crf",
+            str(crf),
+        ]
+
+    # =====================================
+    # FASTSTART
+    # =====================================
+
+    cmd += [
         "-movflags",
         "+faststart",
 
@@ -133,9 +145,7 @@ def create_video_from_concat(
         # OUTPUT
         # ================================
 
-        str(
-            output_file.resolve()
-        )
+        str(output_file.resolve()),
     ]
 
     # =====================================
@@ -149,29 +159,34 @@ def create_video_from_concat(
 
     print(
         "[RenderVideo] "
-        f"Concat: "
-        f"{concat_file}"
+        f"Concat: {concat_file}"
     )
 
     print(
         "[RenderVideo] "
-        f"Output: "
-        f"{output_file}"
+        f"Output: {output_file}"
     )
+
+    if use_gpu:
+        print(
+            "[RenderVideo] "
+            "Encoder: NVIDIA NVENC (h264_nvenc)"
+        )
+    else:
+        print(
+            "[RenderVideo] "
+            f"Encoder: {codec}"
+        )
 
     # =====================================
     # EXECUTE
     # =====================================
 
     process = subprocess.run(
-
         cmd,
-
         stdout=subprocess.PIPE,
-
         stderr=subprocess.PIPE,
-
-        text=True
+        text=True,
     )
 
     # =====================================
@@ -181,7 +196,6 @@ def create_video_from_concat(
     if process.returncode != 0:
 
         raise RuntimeError(
-
             "[RenderVideo] "
             "FFmpeg failed\n\n"
 
@@ -195,14 +209,10 @@ def create_video_from_concat(
     if not output_file.exists():
 
         raise FileNotFoundError(
-            f"Output video missing: "
-            f"{output_file}"
+            f"Output video missing: {output_file}"
         )
 
-    file_size = (
-        output_file.stat()
-        .st_size
-    )
+    file_size = output_file.stat().st_size
 
     if file_size <= 0:
 
@@ -216,8 +226,7 @@ def create_video_from_concat(
 
     print(
         "[RenderVideo] "
-        f"Completed: "
-        f"{output_file}"
+        f"Completed: {output_file}"
     )
 
     print(
@@ -227,3 +236,4 @@ def create_video_from_concat(
     )
 
     return output_file
+

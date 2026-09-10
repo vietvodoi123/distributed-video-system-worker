@@ -14,7 +14,8 @@ async def concat_wav_files(
     *,
     input_files: list[str],
     output_file: str,
-    workspace_dir: Path
+    workspace_dir: Path,
+    use_gpu: bool = False,
 ):
 
     if not input_files:

@@ -18,8 +18,6 @@ from shared.runtime.executors.registry.register_executors import (
     register_executors
 )
 
-
-
 from shared.runtime.workspace.workspace_manager import (
     WorkspaceManager
 )
@@ -52,7 +50,7 @@ class BaseWorker(ABC):
     # INIT
     # ======================================
 
-    def __init__(self):
+    def __init__(self,model_path,config_path):
 
         self.worker_id = str(
             uuid.uuid4()
@@ -61,19 +59,19 @@ class BaseWorker(ABC):
             WorkerResourceProfiler
             .detect()
         )
+        self.gpu_available = (
+            WorkerResourceProfiler.detect_gpu()
+        )
+        print(
+            "[BaseWorker] GPU Available:",
+            self.gpu_available
+        )
         self.api = WorkerApiClient()
         print(
 
             "[BaseWorker] Resource Capacity:",
 
             self.resource_capacity.to_dict()
-        )
-
-        print(
-
-            "[BaseWorker] Max Cost:",
-
-            self.resource_capacity.total_cost()
         )
 
         self.workspace_manager = (
@@ -84,7 +82,8 @@ class BaseWorker(ABC):
             self.create_artifact_storage()
         )
 
-        register_executors()
+
+        register_executors(WorkerResourceProfiler.detect_gpu(),model_path,config_path)
 
         # ==================================
         # CONCURRENCY CONTROL
@@ -96,11 +95,6 @@ class BaseWorker(ABC):
         self.general_semaphore = (
             asyncio.Semaphore(2)
         )
-
-        self.refine_semaphore = (
-            asyncio.Semaphore(1)
-        )
-        self.crawl_semaphore = asyncio.Semaphore(1)
 
         self.inflight_tasks: set[asyncio.Task] = set()
         self.max_slots = 10
@@ -233,16 +227,7 @@ class BaseWorker(ABC):
     # TASK LIMITS
     # ======================================
 
-    def get_semaphore_for_task(
-            self,
-            task_type
-    ):
-        if task_type == "crawl_chapter":
-            return self.crawl_semaphore
-
-        if task_type == "refine_text":
-            return self.refine_semaphore
-
+    def get_semaphore_for_task(self, task_type):
         return self.general_semaphore
 
     # ======================================
@@ -341,19 +326,13 @@ class BaseWorker(ABC):
             # RUNTIME CONTEXT
             # ==================================
 
-            runtime_context = (
-                await create_runtime_context(
-
-                    task=task,
-
-                    worker_id=self.worker_id,
-
-                    workspace_dir=workspace_dir,
-
-                    artifact_storage=self.artifact_storage,
-
-                    api_client=self.api
-                )
+            runtime_context = await create_runtime_context(
+                task=task,
+                worker_id=self.worker_id,
+                workspace_dir=workspace_dir,
+                artifact_storage=self.artifact_storage,
+                api_client=self.api,
+                gpu_available=self.gpu_available,
             )
             # ==================================
             # EXECUTE

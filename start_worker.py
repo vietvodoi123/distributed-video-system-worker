@@ -1,44 +1,31 @@
 import asyncio
-import subprocess
-import os
 from pathlib import Path
 from shared.config.settings import settings
 
 from shared.runtime.workers.base_worker import (
     BaseWorker
 )
-from shared.utils.settings import (
-    load_yaml_settings
-)
-from shared.utils.ffmpeg import setup_ffmpeg
 
-
-cfg = load_yaml_settings()
 
 class Worker(BaseWorker):
 
-    def __init__(self):
+    def __init__(self,model_path,config_path):
 
-        super().__init__()
+        super().__init__(model_path,config_path)
 
         self.capabilities = settings.capabilities
 
 
 async def main():
+    model_path = r'C:\Users\HLC\PycharmProjects\distributed-video-system-worker\shared\data\model\ngochuyennew.onnx'
+    config_path = r'C:\Users\HLC\PycharmProjects\distributed-video-system-worker\shared\data\model\ngochuyennew.onnx.json'
 
-    worker = Worker()
+    worker = Worker(model_path,config_path)
 
     await worker.start()
 
 
 if __name__ == "__main__":
-    # setup_ffmpeg()
-    # subprocess.run(
-    #     ["ffmpeg", "-version"],
-    #     capture_output=True
-    # )
     ROOT = Path(__file__).parent
-
-
 
     asyncio.run(main())

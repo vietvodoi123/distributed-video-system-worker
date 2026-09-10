@@ -78,7 +78,7 @@ def generate_frames_concat_from_segments(
             segment["duration"]
         )
 
-        if duration <= 0:
+        if duration < 0:
 
             raise ValueError(
                 f"Invalid duration "

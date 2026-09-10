@@ -229,7 +229,8 @@ class GenerateVideoExecutor(
         create_video_from_concat(
             concat_file=str(concat_path),
             output_file=str(template_output),
-            fps=8
+            fps=8,
+            use_gpu=runtime_context.gpu_available,
         )
 
         if not template_output.exists():
@@ -312,7 +313,7 @@ class GenerateVideoExecutor(
                 )
             ],
             output_path=str(composited_output),
-            use_gpu=False
+            use_gpu=runtime_context.gpu_available
         )
 
         if not composited_output.exists():

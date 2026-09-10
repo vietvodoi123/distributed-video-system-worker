@@ -1,6 +1,6 @@
 import time
 from pathlib import Path
-
+import asyncio
 from shared.runtime.executors.base.base_task_executor import (
     BaseTaskExecutor,
 )
@@ -117,47 +117,53 @@ class AudioExecutor(
             sentence_silence=0.0,
         )
 
+
         # =====================================
         # GENERATE TTS
         # =====================================
 
-        segment_files = []
-        segments = []
+        tts_semaphore = asyncio.Semaphore(5)
 
-        for line_index, line_text in enumerate(lines):
-
+        async def synthesize_line(
+                line_index: int,
+                line_text: str,
+        ):
             output_file = (
-                Path(
-                    runtime_context.workspace_dir
-                )
-                / f"tts_line_{line_index}.wav"
+                    Path(runtime_context.workspace_dir)
+                    / f"tts_line_{line_index}.wav"
             )
 
-            result = (
-                self.tts_service.synthesize_text(
+            async with tts_semaphore:
+                result = await asyncio.to_thread(
+                    self.tts_service.synthesize_text,
                     text=line_text,
                     output_file=output_file,
                     options=options,
                 )
-            )
 
-            segment_files.append(
-                output_file
-            )
+            return {
+                "line_index": line_index,
+                "line_text": line_text,
+                "output_path": str(output_file),
+                "duration": result.duration,
+            }
 
-            segments.append({
-                "line_index":
+        results = await asyncio.gather(
+            *(
+                synthesize_line(
                     line_index,
-
-                "line_text":
                     line_text,
+                )
+                for line_index, line_text in enumerate(lines)
+            )
+        )
 
-                "output_path":
-                    str(output_file),
+        segments = list(results)
 
-                "duration":
-                    result.duration,
-            })
+        segment_files = [
+            Path(segment["output_path"])
+            for segment in segments
+        ]
 
         # =====================================
         # OUTPUT
@@ -174,15 +180,10 @@ class AudioExecutor(
         # =====================================
 
         await concat_wav_files(
-
-            input_files=
-            segment_files,
-
-            output_file=
-            merged_local_path,
-
-            workspace_dir=
-            runtime_context.workspace_dir,
+            input_files=segment_files,
+            output_file=merged_local_path,
+            workspace_dir=runtime_context.workspace_dir,
+            use_gpu=runtime_context.gpu_available,
         )
 
         # =====================================

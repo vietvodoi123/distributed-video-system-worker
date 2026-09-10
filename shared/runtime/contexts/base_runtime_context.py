@@ -19,6 +19,7 @@ class BaseRuntimeContext(ABC):
             workspace_dir: Path,
             artifact_storage: BaseArtifactStorage,
             api_client=None,
+            gpu_available=False,
     ):
         self.task = task
 
@@ -31,6 +32,8 @@ class BaseRuntimeContext(ABC):
         )
 
         self.api_client = api_client
+
+        self.gpu_available = gpu_available
 
         self.channel = None
 

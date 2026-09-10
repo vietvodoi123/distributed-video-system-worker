@@ -13,6 +13,7 @@ async def create_runtime_context(
     workspace_dir,
     artifact_storage,
     api_client=None,
+    gpu_available=False,
 ):
     # =====================================
     # CHAPTER TASK
@@ -22,22 +23,15 @@ async def create_runtime_context(
 
         context = (
             ChapterRuntimeContext(
-
                 task=task,
-
                 worker_id=worker_id,
-
                 workspace_dir=workspace_dir,
-
                 artifact_storage=artifact_storage,
-
                 batch_id=str(task.batch_id),
-
                 chapter_id=str(task.chapter_id),
-
                 chapter_number=task.chapter_number,
-
-                api_client=api_client
+                api_client=api_client,
+                gpu_available=gpu_available,
             )
         )
 
@@ -49,16 +43,12 @@ async def create_runtime_context(
 
         context = (
             BatchRuntimeContext(
-
                 task=task,
-
                 worker_id=worker_id,
-
                 workspace_dir=workspace_dir,
-
                 artifact_storage=artifact_storage,
-
                 batch_id=str(task.batch_id),
+                gpu_available=gpu_available,
             )
         )
 

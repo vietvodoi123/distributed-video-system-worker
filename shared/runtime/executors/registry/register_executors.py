@@ -66,11 +66,9 @@ from shared.runtime.executors.audio.service.tts_service import TTSService
 from shared.contracts.enums.task_types import *
 from shared.runtime.artifacts.artifact_paths import get_tts_model,get_tts_model_config
 
-def register_executors():
-    model_path = r'C:\Users\HLC\PycharmProjects\distributed-video-system-worker\shared\data\model\ngochuyennew.onnx'
-    config_path = r'C:\Users\HLC\PycharmProjects\distributed-video-system-worker\shared\data\model\ngochuyennew.onnx.json'
+def register_executors(gpu_available,model_path, config_path):
 
-    tts_service = TTSService(model_path=model_path,config_path=config_path)
+    tts_service = TTSService(model_path=model_path,config_path=config_path,use_cuda=gpu_available)
 
     TaskExecutorRegistry.register(
         AUDIO,

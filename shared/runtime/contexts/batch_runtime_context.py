@@ -24,6 +24,7 @@ class BatchRuntimeContext(
             artifact_storage,
             batch_id,
             api_client=None,
+            gpu_available=False,
     ):
         super().__init__(
             task=task,
@@ -31,6 +32,7 @@ class BatchRuntimeContext(
             workspace_dir=workspace_dir,
             artifact_storage=artifact_storage,
             api_client=api_client,
+            gpu_available=gpu_available,
         )
 
         self.batch_id = batch_id

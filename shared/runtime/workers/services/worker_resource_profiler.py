@@ -99,3 +99,35 @@ class WorkerResourceProfiler:
         except Exception:
 
             return 0
+
+    @staticmethod
+    def detect_gpu() -> bool:
+        try:
+            result = subprocess.run(
+                [
+                    "nvidia-smi",
+                    "--query-gpu=name",
+                    "--format=csv,noheader"
+                ],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+
+            if result.returncode != 0:
+                return False
+
+            gpu_name = result.stdout.strip()
+
+            if not gpu_name:
+                return False
+
+            print(
+                "[WorkerProfiler] GPU:",
+                gpu_name
+            )
+
+            return True
+
+        except Exception:
+            return False

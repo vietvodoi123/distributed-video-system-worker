@@ -1,3 +1,4 @@
+
 from dataclasses import dataclass
 
 from shared.utils.run_ffmpeg_with_progress import (
@@ -31,7 +32,7 @@ class VideoLayerComposer:
 
         output_path: str,
 
-        use_gpu: bool = True
+        use_gpu: bool = False
     ):
 
         inputs = [
@@ -111,7 +112,7 @@ class VideoLayerComposer:
             output_tag = f"tmp{idx}"
 
             # =================================
-            # IMPORTANT
+            # OVERLAY
             # =================================
 
             overlay = (
@@ -142,7 +143,7 @@ class VideoLayerComposer:
 
         filter_parts.append(
             f"{current}"
-            f"format=nv12[vout]"
+            f"format=yuv420p[vout]"
         )
 
         filter_complex = ";".join(
@@ -183,19 +184,24 @@ class VideoLayerComposer:
 
         if use_gpu:
 
+            # =================================
+            # NVIDIA NVENC
+            # =================================
+
             cmd += [
 
                 "-c:v",
                 "h264_nvenc",
 
+                # Balanced NVENC preset
                 "-preset",
-                "p5",
+                "p4",
 
                 "-profile:v",
                 "high",
 
                 "-pix_fmt",
-                "nv12",
+                "yuv420p",
 
                 "-rc",
                 "vbr",
@@ -204,10 +210,20 @@ class VideoLayerComposer:
                 "23",
 
                 "-b:v",
-                "2M"
+                "4M",
+
+                "-maxrate",
+                "6M",
+
+                "-bufsize",
+                "12M"
             ]
 
         else:
+
+            # =================================
+            # CPU / LIBX264
+            # =================================
 
             cmd += [
 
@@ -221,8 +237,15 @@ class VideoLayerComposer:
                 "veryfast",
 
                 "-crf",
-                "23"
+                "23",
+
+                "-pix_fmt",
+                "yuv420p"
             ]
+
+        # =====================================
+        # OUTPUT
+        # =====================================
 
         cmd += [
 
@@ -235,8 +258,55 @@ class VideoLayerComposer:
             str(output_path)
         ]
 
+        # =====================================
+        # LOG
+        # =====================================
+
+        print(
+            "[VideoLayerComposer] "
+            "Composing video..."
+        )
+
+        print(
+            "[VideoLayerComposer] "
+            f"Base: {base_video}"
+        )
+
+        print(
+            "[VideoLayerComposer] "
+            f"Overlays: {len(overlays)}"
+        )
+
+        print(
+            "[VideoLayerComposer] "
+            f"Output: {output_path}"
+        )
+
+        if use_gpu:
+
+            print(
+                "[VideoLayerComposer] "
+                "Encoder: NVIDIA NVENC (h264_nvenc)"
+            )
+
+        else:
+
+            print(
+                "[VideoLayerComposer] "
+                "Encoder: CPU (libx264)"
+            )
+
+        # =====================================
+        # EXECUTE
+        # =====================================
+
         run_ffmpeg_with_progress(
             cmd
         )
 
+        # =====================================
+        # VALIDATE
+        # =====================================
+
         return output_path
+
