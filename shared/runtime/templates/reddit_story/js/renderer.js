@@ -1,3 +1,4 @@
+
 const fs = require("fs");
 const path = require("path");
 const puppeteer = require("puppeteer");
@@ -8,7 +9,6 @@ const cliProgress = require("cli-progress");
 // ========================================
 
 const frameDir = process.argv[2];
-
 const renderedPath = process.argv[3];
 
 if (!frameDir) {
@@ -18,9 +18,14 @@ if (!frameDir) {
 if (!renderedPath) {
   throw new Error("Missing rendered.html path");
 }
+
 // ========================================
 // LOAD TEMPLATE
 // ========================================
+
+if (!fs.existsSync(renderedPath)) {
+  throw new Error(`Rendered HTML not found: ${renderedPath}`);
+}
 
 const template = fs.readFileSync(renderedPath, "utf-8");
 
@@ -40,6 +45,10 @@ async function readSegments() {
 
     process.stdin.on("end", () => {
       try {
+        if (!input.trim()) {
+          throw new Error("No input received from stdin.");
+        }
+
         const segments = JSON.parse(input);
 
         if (!Array.isArray(segments)) {
@@ -51,6 +60,8 @@ async function readSegments() {
         reject(err);
       }
     });
+
+    process.stdin.on("error", reject);
   });
 }
 
@@ -58,7 +69,9 @@ async function readSegments() {
 // DIRS
 // ========================================
 
-fs.mkdirSync(frameDir, { recursive: true });
+fs.mkdirSync(frameDir, {
+  recursive: true,
+});
 
 // ========================================
 // CONFIG
@@ -66,30 +79,127 @@ fs.mkdirSync(frameDir, { recursive: true });
 
 const NUM_WORKERS = 1;
 
+const CHROME_PATH =
+  "C:/Program Files/Google/Chrome/Application/chrome.exe";
+
 // ========================================
 // PROGRESS
 // ========================================
 
 const bar = new cliProgress.SingleBar({
   format: "📷 Render | {bar} | {value}/{total} | ETA: {eta_formatted}",
-
   barCompleteChar: "\u2588",
-
   barIncompleteChar: "\u2591",
-
   hideCursor: true,
 });
 
 let completed = 0;
 
 // ========================================
-// WORKER
+// HTML ESCAPE
 // ========================================
 
-async function renderWorker(tasks, indexedSegments) {
-  const browser = await puppeteer.launch({
-    executablePath: "C:/Program Files/Google/Chrome/Application/chrome.exe",
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+// ========================================
+// VALIDATE SEGMENTS
+// ========================================
+
+function validateSegments(segments) {
+  if (!Array.isArray(segments)) {
+    throw new Error("Segments must be an array.");
+  }
+
+  if (!segments.length) {
+    throw new Error("No segments provided.");
+  }
+
+  for (let i = 0; i < segments.length; i++) {
+    const segment = segments[i];
+
+    if (!segment || typeof segment !== "object") {
+      throw new Error(
+        `Invalid segment at input index ${i}. Expected object.`,
+      );
+    }
+
+    if (
+      segment.line_index !== undefined &&
+      segment.line_index !== null &&
+      !Number.isInteger(Number(segment.line_index))
+    ) {
+      throw new Error(
+        `Invalid line_index at input index ${i}: ${segment.line_index}`,
+      );
+    }
+
+    if (segment.line_text === undefined || segment.line_text === null) {
+      throw new Error(
+        `Missing line_text at input index ${i}.`,
+      );
+    }
+  }
+}
+
+// ========================================
+// CREATE INDEXED SEGMENTS
+// ========================================
+
+function createIndexedSegments(segments) {
+  return segments.map((segment, index) => ({
+    ...segment,
+
+    // Renderer index is ALWAYS based on the actual
+    // position in the rendered DOM.
+    render_index: index,
+  }));
+}
+
+// ========================================
+// BUILD HTML
+// ========================================
+
+function buildHtml(indexedSegments) {
+  const linesHtml = indexedSegments
+    .map((segment) => {
+      const renderIndex = segment.render_index;
+      const lineText = escapeHtml(segment.line_text);
+
+      return `
+        <span
+          class="segment"
+          data-index="${renderIndex}"
+        >${lineText}</span>
+      `;
+    })
+    .join("\n");
+
+  if (!template.includes("{{LINES}}")) {
+    throw new Error(
+      'Template does not contain "{{LINES}}" placeholder.',
+    );
+  }
+
+  return template.replace("{{LINES}}", linesHtml);
+}
+
+// ========================================
+// CREATE BROWSER
+// ========================================
+
+async function createBrowser() {
+  return puppeteer.launch({
+    executablePath: CHROME_PATH,
+
     headless: "new",
+
     args: [
       "--no-sandbox",
       "--disable-setuid-sandbox",
@@ -103,152 +213,356 @@ async function renderWorker(tasks, indexedSegments) {
       "--mute-audio",
     ],
   });
+}
 
-  const page = await browser.newPage();
+// ========================================
+// WORKER
+// ========================================
 
-  await page.setViewport({
-    width: 1280,
+async function renderWorker(tasks, indexedSegments) {
+  let browser = null;
 
-    height: 720,
-  });
+  try {
+    // ======================================
+    // BROWSER
+    // ======================================
 
-  await page.emulateMediaFeatures([
-    {
-      name: "prefers-reduced-motion",
-      value: "reduce",
-    },
-  ]);
+    browser = await createBrowser();
 
-  // ==================================
-  // BUILD HTML ONCE
-  // ==================================
+    const page = await browser.newPage();
 
-  const html = template.replace(
-    "{{LINES}}",
+    await page.setViewport({
+      width: 1280,
+      height: 720,
+    });
 
-    indexedSegments
-      .map(
-        (s) => `
+    await page.emulateMediaFeatures([
+      {
+        name: "prefers-reduced-motion",
+        value: "reduce",
+      },
+    ]);
 
-              <span
-                class="segment"
-                data-index="${s.render_index}"
-              >
-                ${s.line_text}
-              </span>
+    // ======================================
+    // BUILD HTML ONCE
+    // ======================================
 
-            `,
-      )
-      .join("\n"),
-  );
+    const html = buildHtml(indexedSegments);
 
-  // ==================================
-  // LOAD PAGE
-  // ==================================
+    // ======================================
+    // LOAD PAGE
+    // ======================================
 
-  await page.setContent(
-    html,
-
-    {
+    await page.setContent(html, {
       waitUntil: "domcontentloaded",
-    },
-  );
+    });
 
-  await page.evaluate(() => document.fonts.ready);
+    // ======================================
+    // WAIT FOR FONTS
+    // ======================================
 
-  await page.waitForSelector(".segment");
-  // ==================================
-  // CACHE DOM
-  // ==================================
+    await page.evaluate(async () => {
+      if (document.fonts) {
+        await document.fonts.ready;
+      }
+    });
 
-  await page.evaluate(() => {
-    window.segmentElements = Array.from(document.querySelectorAll(".segment"));
+    // ======================================
+    // WAIT FOR SEGMENTS
+    // ======================================
 
-    window.currentHighlight = null;
-  });
+    await page.waitForSelector(".segment", {
+      timeout: 30000,
+    });
 
-  for (const segment of tasks) {
-    try {
-      const line_index = segment.line_index;
+    // ======================================
+    // VERIFY DOM
+    // ======================================
 
-      // ==================================
-      // SCROLL ACTIVE SEGMENT
-      // ==================================
+    const domInfo = await page.evaluate(() => {
+      const elements = Array.from(
+        document.querySelectorAll(".segment"),
+      );
 
-      await page.evaluate(
-        (index) => {
+      return {
+        count: elements.length,
+
+        indexes: elements.map((el) =>
+          el.getAttribute("data-index"),
+        ),
+
+        textLengths: elements.map(
+          (el) => el.textContent?.length ?? 0,
+        ),
+      };
+    });
+
+    console.log(
+      `[Renderer] Input segments: ${indexedSegments.length}`,
+    );
+
+    console.log(
+      `[Renderer] DOM segments: ${domInfo.count}`,
+    );
+
+    // ======================================
+    // DOM COUNT CHECK
+    // ======================================
+
+    if (domInfo.count !== indexedSegments.length) {
+      const expectedIndexes = indexedSegments.map(
+        (segment) => String(segment.render_index),
+      );
+
+      const actualIndexes = domInfo.indexes;
+
+      const missingIndexes = expectedIndexes.filter(
+        (index) => !actualIndexes.includes(index),
+      );
+
+      const extraIndexes = actualIndexes.filter(
+        (index) => !expectedIndexes.includes(index),
+      );
+
+      throw new Error(
+        [
+          "Segment count mismatch.",
+          `Input: ${indexedSegments.length}`,
+          `DOM: ${domInfo.count}`,
+          `Missing indexes: ${
+            missingIndexes.length
+              ? missingIndexes.join(", ")
+              : "none"
+          }`,
+          `Extra indexes: ${
+            extraIndexes.length
+              ? extraIndexes.join(", ")
+              : "none"
+          }`,
+        ].join(" "),
+      );
+    }
+
+    // ======================================
+    // VERIFY DOM INDEXES
+    // ======================================
+
+    const invalidDomIndexes = domInfo.indexes.filter(
+      (value, index) => value !== String(index),
+    );
+
+    if (invalidDomIndexes.length) {
+      console.error(
+        "[Renderer] Invalid DOM indexes:",
+        invalidDomIndexes,
+      );
+
+      throw new Error(
+        "DOM segment indexes are not sequential.",
+      );
+    }
+
+    // ======================================
+    // CACHE DOM
+    // ======================================
+
+    await page.evaluate(() => {
+      window.segmentElements = Array.from(
+        document.querySelectorAll(".segment"),
+      );
+
+      window.currentHighlight = null;
+    });
+
+    // ======================================
+    // VERIFY CACHE
+    // ======================================
+
+    const cachedCount = await page.evaluate(() => {
+      return window.segmentElements?.length ?? 0;
+    });
+
+    if (cachedCount !== indexedSegments.length) {
+      throw new Error(
+        `Cached segment count mismatch: expected=${indexedSegments.length}, actual=${cachedCount}`,
+      );
+    }
+
+    // ======================================
+    // RENDER TASKS
+    // ======================================
+
+    for (const segment of tasks) {
+      try {
+        // ==================================
+        // RESOLVE RENDER INDEX
+        // ==================================
+
+        const lineIndex = Number(segment.render_index);
+
+        if (!Number.isInteger(lineIndex)) {
+          throw new Error(
+            `Invalid render_index: ${segment.render_index}`,
+          );
+        }
+
+        // ==================================
+        // RANGE CHECK
+        // ==================================
+
+        if (
+          lineIndex < 0 ||
+          lineIndex >= indexedSegments.length
+        ) {
+          throw new Error(
+            [
+              `Render index ${lineIndex} is out of range.`,
+              `Total segments: ${indexedSegments.length}`,
+              `Original line_index: ${segment.line_index}`,
+            ].join(" "),
+          );
+        }
+
+        // ==================================
+        // DEBUG
+        // ==================================
+
+        console.log(
+          `[Renderer] Rendering segment ` +
+            `${lineIndex}/${indexedSegments.length - 1}` +
+            ` | line_index=${segment.line_index}`,
+        );
+
+        // ==================================
+        // SCROLL ACTIVE SEGMENT
+        // ==================================
+
+        await page.evaluate((index) => {
           const elements = window.segmentElements;
 
-          if (!elements) {
-            throw new Error("segmentElements not initialized.");
-          }
-
-          if (window.currentHighlight) {
-            window.currentHighlight.classList.remove("highlight");
+          if (!Array.isArray(elements)) {
+            throw new Error(
+              "segmentElements not initialized.",
+            );
           }
 
           const el = elements[index];
 
           if (!el) {
-            throw new Error(`Segment ${index} not found.`);
+            throw new Error(
+              `Segment ${index} not found. ` +
+                `DOM contains ${elements.length} segments.`,
+            );
           }
+
+          // Remove previous highlight.
+
+          if (window.currentHighlight) {
+            window.currentHighlight.classList.remove(
+              "highlight",
+            );
+          }
+
+          // Add current highlight.
 
           el.classList.add("highlight");
 
           window.currentHighlight = el;
 
+          // Scroll.
+
           el.scrollIntoView({
             behavior: "instant",
-
             block: "center",
           });
-        },
+        }, lineIndex);
 
-        line_index,
-      );
+        // ==================================
+        // FRAME PATH
+        // ==================================
 
-      // ==================================
-      // FRAME PATH
-      // ==================================
+        const framePath = path.join(
+          frameDir,
+          `frame${String(lineIndex).padStart(4, "0")}.jpg`,
+        );
 
-      const framePath = path.join(
-        frameDir,
+        // ==================================
+        // WAIT FOR PAINT
+        // ==================================
 
-        `frame${String(line_index).padStart(4, "0")}.jpg`,
-      );
+        await page.evaluate(
+          () =>
+            new Promise((resolve) =>
+              requestAnimationFrame(() => resolve()),
+            ),
+        );
 
-      await page.evaluate(
-        () => new Promise((resolve) => requestAnimationFrame(resolve)),
-      );
-      // ==================================
-      // SCREENSHOT
-      // ==================================
+        // ==================================
+        // SCREENSHOT
+        // ==================================
 
-      await page.screenshot({
-        path: framePath,
+        await page.screenshot({
+          path: framePath,
 
-        type: "jpeg",
+          type: "jpeg",
 
-        quality: 85,
+          quality: 85,
 
-        optimizeForSpeed: true,
+          optimizeForSpeed: true,
 
-        captureBeyondViewport: false,
+          captureBeyondViewport: false,
 
-        fromSurface: true,
-      });
+          fromSurface: true,
+        });
 
-      completed++;
+        // ==================================
+        // PROGRESS
+        // ==================================
 
-      bar.update(completed);
-    } catch (err) {
-      console.error("[Renderer] ERROR:", err);
+        completed++;
 
-      throw err;
+        bar.update(completed);
+      } catch (err) {
+        console.error(
+          `[Renderer] Failed to render segment`,
+        );
+
+        console.error(
+          JSON.stringify(
+            {
+              line_index: segment.line_index,
+              render_index: segment.render_index,
+              line_text:
+                String(segment.line_text ?? "").slice(
+                  0,
+                  200,
+                ),
+              error: err?.message,
+            },
+            null,
+            2,
+          ),
+        );
+
+        throw err;
+      }
+    }
+  } finally {
+    // ======================================
+    // CLOSE BROWSER
+    // ======================================
+
+    if (browser) {
+      try {
+        await browser.close();
+      } catch (err) {
+        console.error(
+          "[Renderer] Failed to close browser:",
+          err,
+        );
+      }
     }
   }
-
-  await browser.close();
 }
 
 // ========================================
@@ -257,35 +571,100 @@ async function renderWorker(tasks, indexedSegments) {
 
 (async () => {
   try {
+    // ======================================
+    // READ INPUT
+    // ======================================
+
     const segments = await readSegments();
 
-    if (!segments.length) {
-      throw new Error("No segments provided.");
-    }
+    // ======================================
+    // VALIDATE INPUT
+    // ======================================
 
-    const indexedSegments = segments.map((segment, index) => ({
-      ...segment,
+    validateSegments(segments);
 
-      render_index: index,
-    }));
+    // ======================================
+    // INDEX SEGMENTS
+    // ======================================
 
-    const chunked = Array.from({ length: NUM_WORKERS }, () => []);
+    const indexedSegments =
+      createIndexedSegments(segments);
+
+    console.log(
+      `[Renderer] Received ${indexedSegments.length} segments.`,
+    );
+
+    // ======================================
+    // SHOW LAST SEGMENT
+    // ======================================
+
+    const lastSegment =
+      indexedSegments[indexedSegments.length - 1];
+
+    console.log(
+      `[Renderer] Last segment:`,
+      JSON.stringify(
+        {
+          render_index: lastSegment.render_index,
+          line_index: lastSegment.line_index,
+        },
+        null,
+        2,
+      ),
+    );
+
+    // ======================================
+    // CREATE WORKER CHUNKS
+    // ======================================
+
+    const chunked = Array.from(
+      {
+        length: NUM_WORKERS,
+      },
+      () => [],
+    );
 
     indexedSegments.forEach((segment, i) => {
       chunked[i % NUM_WORKERS].push(segment);
     });
 
+    // ======================================
+    // START PROGRESS
+    // ======================================
+
     bar.start(indexedSegments.length, 0);
 
+    // ======================================
+    // RUN WORKERS
+    // ======================================
+
     await Promise.all(
-      chunked.map((tasks) => renderWorker(tasks, indexedSegments)),
+      chunked.map((tasks) =>
+        renderWorker(
+          tasks,
+          indexedSegments,
+        ),
+      ),
     );
+
+    // ======================================
+    // STOP PROGRESS
+    // ======================================
 
     bar.stop();
 
-    console.log("🎉 Frames rendered.");
+    console.log(
+      "🎉 Frames rendered.",
+    );
   } catch (err) {
-    console.error("[FATAL]", err);
+    try {
+      bar.stop();
+    } catch (_) {}
+
+    console.error(
+      "[FATAL]",
+      err,
+    );
 
     if (err && err.stack) {
       console.error(err.stack);
@@ -294,3 +673,4 @@ async function renderWorker(tasks, indexedSegments) {
     process.exit(1);
   }
 })();
+
