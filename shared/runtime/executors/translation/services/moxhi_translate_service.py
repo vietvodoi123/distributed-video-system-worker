@@ -1,11 +1,9 @@
 import httpx
-
+from shared.config.settings import settings
 
 class MoxhiTranslateService:
 
-    BASE_URL = (
-        "http://127.0.0.1:8090"
-    )
+    BASE_URL = settings.api.translate_url
 
     TRANSLATE_URL = (
         f"{BASE_URL}/translate"

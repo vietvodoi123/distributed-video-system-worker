@@ -19,6 +19,7 @@ class WorkerSettings(BaseModel):
 
 class ApiSettings(BaseModel):
     base_url: str
+    translate_moxhi: str
 
 
 class RunwareSettings(BaseModel):
