@@ -125,20 +125,6 @@ class MergeBatchVideosExecutor(
             "Merge order:"
         )
 
-        for index, video_path in enumerate(
-            sorted_video_paths,
-            start=1,
-        ):
-            chapter_number = self._get_chapter_number(
-                video_path
-            )
-
-            print(
-                f"  {index:03d}. "
-                f"Chapter {chapter_number} -> "
-                f"{video_path}"
-            )
-
         # =====================================
         # MATERIALIZE LOCAL FILES
         # =====================================
@@ -146,11 +132,7 @@ class MergeBatchVideosExecutor(
         local_video_paths = []
 
         for remote_video_path in sorted_video_paths:
-            print(
-                "[MergeBatchVideosExecutor] "
-                f"Materializing: "
-                f"{remote_video_path}"
-            )
+
 
             local_path = Path(
                 await storage.get_local_path(

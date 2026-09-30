@@ -35,9 +35,6 @@ from shared.runtime.templates.reddit_story.python.render_video import (
     create_video_from_concat
 )
 
-from shared.integrations.youtube.bootstrap import (
-    youtube_api
-)
 
 from shared.runtime.artifacts.artifact_paths import (
     get_project_root
@@ -79,6 +76,12 @@ class GenerateVideoExecutor(
         duration = payload.get("duration")
         audio_input = payload.get("audio_input")
 
+        channel_name = payload.get("channel_name")
+        channel_id = payload.get("channel_id")
+        channel_subs = payload.get("channel_subs")
+        channel_avatar_url = payload.get("channel_avatar_url")
+
+
         required = {
             "title": title,
             "type": video_type,
@@ -90,6 +93,10 @@ class GenerateVideoExecutor(
             "segments": segments,
             "duration": duration,
             "audio_input": audio_input,
+            "channel_name": channel_name,
+            "channel_id": channel_id,
+            "channel_subs": channel_subs,
+            "channel_avatar_url": channel_avatar_url,
         }
 
         missing = [
@@ -149,12 +156,6 @@ class GenerateVideoExecutor(
             "Step 1/5 - Rendering template"
         )
 
-        channel_info = (
-            youtube_api
-            .get_channel_by_handle(
-                youtube_channel_id
-            )
-        )
 
         project_root = get_project_root()
 
@@ -182,10 +183,10 @@ class GenerateVideoExecutor(
             "number_eps": number_eps,
             "type": video_type,
             "background_url": background_url,
-            "channel_name": channel_info["name"],
-            "channel_id": youtube_channel_id,
-            "channel_subs": channel_info["subscribers"],
-            "channel_avatar_url": channel_info["avatar_url"],
+            "channel_name": channel_name,
+            "channel_id": channel_id,
+            "channel_subs": channel_subs,
+            "channel_avatar_url": channel_avatar_url,
             "mc_name": mc_name,
         }
 

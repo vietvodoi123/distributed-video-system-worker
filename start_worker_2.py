@@ -5,7 +5,10 @@ from shared.config.settings import settings
 from shared.runtime.workers.base_worker import (
     BaseWorker
 )
+ROOT = Path(__file__).resolve().parent
 
+model_path = ROOT / "shared/data/model/ngochuyennew.onnx"
+config_path = ROOT / "shared/data/model/ngochuyennew.onnx.json"
 
 class Worker(BaseWorker):
 
@@ -17,9 +20,6 @@ class Worker(BaseWorker):
 
 
 async def main():
-    model_path = r'C:\Users\HLC\PycharmProjects\distributed-video-system-worker\shared\data\model\ngochuyennew.onnx'
-    config_path = r'C:\Users\HLC\PycharmProjects\distributed-video-system-worker\shared\data\model\ngochuyennew.onnx.json'
-
     worker = Worker(model_path,config_path)
 
     await worker.start()

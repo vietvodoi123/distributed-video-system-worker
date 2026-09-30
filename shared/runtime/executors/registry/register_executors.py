@@ -12,35 +12,6 @@ from shared.runtime.executors.text.preprocess_text_executor import (
 from shared.runtime.executors.translation.translate_text_excutor import (
     TranslateTextExecutor
 )
-from shared.runtime.executors.refine.refine_text_executor import (
-    RefineTextExecutor
-)
-from shared.runtime.executors.audio.generate_tts_segments_executor import (
-    GenerateTtsSegmentsExecutor
-)
-
-from shared.runtime.executors.audio.merge_tts_segments_executor import (
-    MergeTtsSegmentsExecutor
-)
-
-from shared.runtime.executors.video.generate_text_scroll_executor import (
-    GenerateTextScrollExecutor
-)
-from shared.runtime.executors.video.generate_mc_loop_executor import (
-    GenerateMcLoopExecutor
-)
-from shared.runtime.executors.video.render_template_executor import (
-    RenderTemplateExecutor
-)
-from shared.runtime.executors.video.compose_video_layers_executor import (
-    ComposeVideoLayersExecutor
-)
-from shared.runtime.executors.video.merge_audio_into_video_executor import (
-    MergeAudioIntoVideoExecutor
-)
-from shared.runtime.executors.metadata.generate_batch_youtube_description_executor import (
-    GenerateBatchYoutubeDescriptionExecutor
-)
 from shared.runtime.executors.video.merge_batch_videos_executor import (
     MergeBatchVideosExecutor
 )
@@ -50,21 +21,14 @@ from shared.runtime.executors.video.generate_batch_thumbnail_executor import (
 from shared.runtime.executors.video.generate_video_executor import (
     GenerateVideoExecutor
 )
-from shared.runtime.executors.youtube.generate_batch_youtube_upload_executor import (
-    GenerateBatchYoutubeUploadExecutor
-)
-from shared.runtime.executors.task_line.generate_task_line_executor import (
-    GenerateLineTaskExecutor
-)
+
 
 from shared.runtime.executors.audio.audio_executor import (
     AudioExecutor
 )
-from shared.config.settings import settings
 from shared.runtime.executors.audio.service.tts_service import TTSService
 
 from shared.contracts.enums.task_types import *
-from shared.runtime.artifacts.artifact_paths import get_tts_model,get_tts_model_config
 
 def register_executors(gpu_available,model_path, config_path):
 
@@ -86,42 +50,7 @@ def register_executors(gpu_available,model_path, config_path):
         TRANSLATE_TEXT,
         TranslateTextExecutor()
     )
-    # TaskExecutorRegistry.register(
-    #     REFINE_TEXT,
-    #     RefineTextExecutor()
-    # )
-    TaskExecutorRegistry.register(
-        GENERATE_TTS_SEGMENTS,
-        GenerateTtsSegmentsExecutor()
-    )
-    TaskExecutorRegistry.register(
-        MERGE_TTS_SEGMENTS,
-        MergeTtsSegmentsExecutor()
-    )
-    TaskExecutorRegistry.register(
-        TEXT_SCROLL_LOOP,
-        GenerateTextScrollExecutor()
-    )
-    TaskExecutorRegistry.register(
-        MC_LOOP,
-        GenerateMcLoopExecutor()
-    )
-    TaskExecutorRegistry.register(
-        RENDER_TEMPLATE,
-        RenderTemplateExecutor()
-    )
-    TaskExecutorRegistry.register(
-        COMPOSE_VIDEO_LAYERS,
-        ComposeVideoLayersExecutor()
-    )
-    TaskExecutorRegistry.register(
-        MERGE_AUDIO_INTO_VIDEO,
-        MergeAudioIntoVideoExecutor()
-    )
-    TaskExecutorRegistry.register(
-        GENERATE_YOUTUBE_DESCRIPTION,
-        GenerateBatchYoutubeDescriptionExecutor()
-    )
+
     TaskExecutorRegistry.register(
         MERGE_BATCH_VIDEO,
         MergeBatchVideosExecutor()
@@ -134,10 +63,4 @@ def register_executors(gpu_available,model_path, config_path):
         GENERATE_BATCH_THUMBNAIL,
         GenerateBatchThumbnailExecutor()
     )
-    TaskExecutorRegistry.register(
-        GENERATE_BATCH_YOUTUBE_UPLOAD,
-        GenerateBatchYoutubeUploadExecutor()
-    )
-    TaskExecutorRegistry.register(
-        GENERATE_LINE_TASK,GenerateLineTaskExecutor()
-    )
+

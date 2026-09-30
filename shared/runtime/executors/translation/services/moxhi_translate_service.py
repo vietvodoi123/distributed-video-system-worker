@@ -3,7 +3,7 @@ from shared.config.settings import settings
 
 class MoxhiTranslateService:
 
-    BASE_URL = settings.api.translate_url
+    BASE_URL = settings.api.translate_moxhi
 
     TRANSLATE_URL = (
         f"{BASE_URL}/translate"
