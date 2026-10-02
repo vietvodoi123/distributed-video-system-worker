@@ -97,7 +97,7 @@ class BaseWorker(ABC):
         )
 
         self.inflight_tasks: set[asyncio.Task] = set()
-        self.max_slots = 10
+        self.max_slots = 4
 
     def available_slots(self) -> int:
         return max(
