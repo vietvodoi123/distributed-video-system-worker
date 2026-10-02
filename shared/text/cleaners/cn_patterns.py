@@ -71,6 +71,14 @@ AD_PATTERNS = [
     r"^分享給朋友：.*$",
 ]
 
+# Quảng cáo có thể được chèn ngay giữa đoạn truyện, không đứng riêng
+# trên một dòng. Các mẫu này được xử lý trước khi xóa domain để loại bỏ
+# cả phần câu quảng cáo còn lại sau khi domain đã biến mất.
+INLINE_AD_PATTERNS = [
+    r"[（(][^\n）)]*(?:請用戶直接瀏覽器訪問|请用户直接浏览器访问|記住本站域名|记住本站域名|望讀者記一下我們域名|望读者记一下我们域名|觀看最快的章節更新|观看最快的章节更新|天天看小說|天天看小说)[^\n）)]*[）)]",
+    r"【[^\n】]*(?:記住本站|记住本站|望讀者記一下我們域名|望读者记一下我们域名|天天看小說|天天看小说|域名)[^\n】]*】",
+]
+
 
 # ============================================================
 # NOISE
@@ -143,6 +151,7 @@ DOMAIN_PATTERN = (
     r")+"
     r"(?:"
         r"com|"
+        r"tw|"
         r"net|"
         r"org|"
         r"edu|"

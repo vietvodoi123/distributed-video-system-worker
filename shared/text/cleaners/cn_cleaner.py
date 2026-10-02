@@ -1,9 +1,11 @@
 # shared/text/cleaners/cn_cleaner.py
 
 import re
+import unicodedata
 
 from shared.text.cleaners.cn_patterns import (
     AD_PATTERNS,
+    INLINE_AD_PATTERNS,
     NOISE_PATTERNS,
     URL_PATTERNS,
     DOMAIN_PATTERN,
@@ -80,13 +82,75 @@ def _remove_domains(
         text
     )
 
+    # 1. Xóa domain ASCII bình thường.
     text = re.sub(
         DOMAIN_PATTERN,
         "",
         text,
     )
 
+    # 2. Xóa domain bị Unicode hóa / làm giả ký tự.
+    #
+    # Ví dụ:
+    #     𝟨𝟫𝐬𝐡𝐮𝐱.𝐜𝐨𝐦
+    #
+    # NFKC sẽ biến chuỗi trên thành:
+    #     69shux.com
+    #
+    # Không normalize toàn bộ chapter vì NFKC có thể làm thay đổi
+    # các ký tự Unicode khác trong nội dung tiếng Trung.
+    text = _remove_unicode_domains(
+        text
+    )
+
     return text
+
+
+def _remove_unicode_domains(
+    text: str,
+) -> str:
+    """
+    Xóa domain sử dụng Unicode lookalike / mathematical characters.
+
+    Chỉ normalize từng candidate có dấu chấm thay vì normalize
+    toàn bộ text, để không làm thay đổi nội dung tiếng Trung.
+
+    Ví dụ:
+        𝟨𝟫𝐬𝐡𝐮𝐱.𝐜𝐨𝐦 -> 69shux.com -> bị xóa
+        example.com     -> đã được xử lý bởi DOMAIN_PATTERN
+    """
+
+    # Chỉ lấy token có dấu ".".
+    # Không normalize toàn bộ chapter.
+    candidate_pattern = re.compile(
+        r"""(?<![\w])[^\s<>\[\]{}"'，。！？；：、（）()【】》]+\.[^\s<>\[\]{}"'，。！？；：、（）()【】》]+"""
+    )
+
+    def replace_candidate(
+        match: re.Match,
+    ) -> str:
+        candidate = match.group(0)
+
+        normalized = unicodedata.normalize(
+            "NFKC",
+            candidate,
+        )
+
+        # Sau NFKC nếu trở thành domain hợp lệ thì xóa
+        # candidate GỐC, không xóa bản normalized.
+        if re.fullmatch(
+            DOMAIN_PATTERN,
+            normalized,
+            flags=re.IGNORECASE,
+        ):
+            return ""
+
+        return candidate
+
+    return candidate_pattern.sub(
+        replace_candidate,
+        text,
+    )
 
 
 # ============================================================
@@ -102,6 +166,22 @@ def _remove_ads(
 
     for pattern in AD_PATTERNS:
 
+        text = re.sub(
+            pattern,
+            "",
+            text,
+            flags=re.M,
+        )
+
+    return text
+
+
+def _remove_inline_ads(
+    text: str,
+) -> str:
+    """Xóa quảng cáo được chèn trong cùng dòng với nội dung truyện."""
+
+    for pattern in INLINE_AD_PATTERNS:
         text = re.sub(
             pattern,
             "",
@@ -645,6 +725,10 @@ def clean_cn_content(
     # --------------------------------------------------------
 
     text = _remove_ads(
+        text
+    )
+
+    text = _remove_inline_ads(
         text
     )
 
