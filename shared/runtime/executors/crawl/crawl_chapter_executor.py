@@ -16,6 +16,7 @@ from shared.runtime.contexts.chapter_runtime_context import (
 )
 
 from shared.crawler.engine_factory import EngineFactory
+from shared.text.cleaners.cn_cleaner import clean_cn_content
 class CrawlChapterExecutor(
     BaseTaskExecutor
 ):
@@ -147,11 +148,15 @@ class CrawlChapterExecutor(
 
 
         # =========================
-        # BUILD RAW TEXT
+        # CLEAN & BUILD RAW TEXT
         # =========================
 
+        cleaned_content = clean_cn_content(
+            content
+        )
+
         raw_text = (
-            f"{title}\n\n{content}"
+            f"{title}\n\n{cleaned_content}"
         ).strip()
 
 

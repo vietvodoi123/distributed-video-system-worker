@@ -9,6 +9,7 @@ from shared.text.cleaners.cn_patterns import (
     NOISE_PATTERNS,
     URL_PATTERNS,
     DOMAIN_PATTERN,
+    HOMOGLYPH_MAP,
     SENTENCE_END_CHARS,
     CLOSING_QUOTE_CHARS,
 )
@@ -110,35 +111,37 @@ def _remove_unicode_domains(
     text: str,
 ) -> str:
     """
-    Xóa domain sử dụng Unicode lookalike / mathematical characters.
+    Xóa domain sử dụng Unicode lookalike / mathematical characters / homoglyphs.
 
     Chỉ normalize từng candidate có dấu chấm thay vì normalize
     toàn bộ text, để không làm thay đổi nội dung tiếng Trung.
 
     Ví dụ:
         𝟨𝟫𝐬𝐡𝐮𝐱.𝐜𝐨𝐦 -> 69shux.com -> bị xóa
+        ⑧вОΟｋ.Ｃоｍ -> 8book.com -> bị xóa
+        ⑧bοоК．ｃＯm -> 8book.com -> bị xóa
+        ⒏ｂoОК.CΟｍ -> 8.book.com -> bị xóa
         example.com     -> đã được xử lý bởi DOMAIN_PATTERN
     """
 
-    # Chỉ lấy token có dấu ".".
-    # Không normalize toàn bộ chapter.
-    candidate_pattern = re.compile(
-        r"""(?<![\w])[^\s<>\[\]{}"'，。！？；：、（）()【】》]+\.[^\s<>\[\]{}"'，。！？；：、（）()【】》]+"""
-    )
+    # Bắt candidate có dấu chấm hoặc ký tự chấm tương đương,
+    # không ăn lan sang chữ Hán hoặc dấu câu tiếng Trung.
+    candidate_pattern = CANDIDATE_DOMAIN_PATTERN
 
     def replace_candidate(
         match: re.Match,
     ) -> str:
         candidate = match.group(0)
 
-        normalized = unicodedata.normalize(
-            "NFKC",
-            candidate,
-        )
+        normalized = _normalize_confusables(candidate)
 
-        # Sau NFKC nếu trở thành domain hợp lệ thì xóa
+        # Sau khi giải mã homoglyphs và NFKC, nếu khớp domain thì xóa
         # candidate GỐC, không xóa bản normalized.
         if re.fullmatch(
+            DOMAIN_PATTERN,
+            normalized,
+            flags=re.IGNORECASE,
+        ) or re.search(
             DOMAIN_PATTERN,
             normalized,
             flags=re.IGNORECASE,
@@ -151,6 +154,70 @@ def _remove_unicode_domains(
         replace_candidate,
         text,
     )
+
+
+# ============================================================
+# AD & DOMAIN LINES REMOVAL
+# ============================================================
+
+AD_LINE_KEYWORDS = re.compile(
+    r"(?:天天看小說|天天看小说|讀小說|读小说|看小說|看小说|看書首選|看书首选|"
+    r"追書認準|追书认准|最新網址|最新网址|記住本站|记住本站|本站域名|"
+    r"瀏覽器訪問|浏览器访问|觀看最快|观看最快|緩存原因|缓存原因|"
+    r"超省心|超給力|超给力|超貼心|超贴心|體驗佳|体验佳|等你讀|等你读|超讚|超赞|等你看|無彈窗|无弹窗)"
+)
+
+CANDIDATE_DOMAIN_PATTERN = re.compile(
+    r"""(?<![a-zA-Z0-9])[^\s\u4e00-\u9fff\u3400-\u4dbf，。！？；：、（）()【】《》「」『』"'<>\[\]{}]+"""
+    r"""[\.．․‧•·]"""
+    r"""[^\s\u4e00-\u9fff\u3400-\u4dbf，。！？；：、（）()【】《》「」『』"'<>\[\]{}]+"""
+)
+
+
+def _normalize_confusables(candidate_str: str) -> str:
+    # Ánh xạ các ký tự ngoặc đơn/đồng hình trước (như ⑻ -> 8) để tránh bị NFKC tách thành (8)
+    t = candidate_str.translate(HOMOGLYPH_MAP)
+    t = unicodedata.normalize("NFKC", t)
+    return t.translate(HOMOGLYPH_MAP)
+
+
+def _line_contains_domain(line: str) -> bool:
+    for p in URL_PATTERNS:
+        if re.search(p, line):
+            return True
+    if re.search(DOMAIN_PATTERN, line):
+        return True
+    # Kiểm tra toàn bộ dòng sau khi chuẩn hóa (rất hiệu quả cho dòng tên miền đứng riêng)
+    norm_line = _normalize_confusables(line)
+    if re.search(DOMAIN_PATTERN, norm_line):
+        return True
+    for m in CANDIDATE_DOMAIN_PATTERN.finditer(line):
+        candidate = m.group(0)
+        norm = _normalize_confusables(candidate)
+        if re.fullmatch(DOMAIN_PATTERN, norm, flags=re.IGNORECASE) or re.search(DOMAIN_PATTERN, norm, flags=re.IGNORECASE):
+            return True
+    return False
+
+
+def _remove_ad_and_domain_lines(text: str) -> str:
+    """
+    Xóa toàn bộ dòng nếu dòng đó là dòng watermark / quảng cáo:
+    - Dòng chứa tên miền + từ khóa quảng cáo (như '讀小說上天天看小說，𝒕𝒕𝒌.𝒕𝒘超省心')
+    - Dòng chứa tên miền và ngắn (<= 50 ký tự như '⑧вОΟｋ.Ｃоｍ')
+    - Dòng chứa cụm từ quảng cáo đứng riêng (<= 60 ký tự)
+    """
+    lines = []
+    for line in text.splitlines():
+        strip_l = line.strip()
+        if not strip_l:
+            lines.append(line)
+            continue
+        has_dom = _line_contains_domain(strip_l)
+        has_ad = bool(AD_LINE_KEYWORDS.search(strip_l))
+        if (has_dom and has_ad and len(strip_l) <= 100) or (has_dom and len(strip_l) <= 50) or (has_ad and len(strip_l) <= 60):
+            continue
+        lines.append(line)
+    return "\n".join(lines)
 
 
 # ============================================================
@@ -724,11 +791,19 @@ def clean_cn_content(
     # REMOVE ADS
     # --------------------------------------------------------
 
+    text = _remove_inline_ads(
+        text
+    )
+
     text = _remove_ads(
         text
     )
 
-    text = _remove_inline_ads(
+    # --------------------------------------------------------
+    # REMOVE DEDICATED AD & DOMAIN LINES
+    # --------------------------------------------------------
+
+    text = _remove_ad_and_domain_lines(
         text
     )
 
