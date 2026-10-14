@@ -179,12 +179,13 @@ class LocalSharedStorage(
         )
 
     # =====================================
-    # LOCAL ACCESS
+    # LOCAL ACCESS & STREAMING
     # =====================================
 
     async def get_local_path(
         self,
-        path: str
+        path: str,
+        workspace_dir: str = ""
     ) -> str:
 
         full_path = (
@@ -197,3 +198,17 @@ class LocalSharedStorage(
         )
 
         return str(full_path)
+
+    async def upload_file(
+        self,
+        remote_path: str,
+        local_file_path: str
+    ):
+        import shutil
+
+        dest = self._resolve_path(remote_path)
+        dest.parent.mkdir(
+            parents=True,
+            exist_ok=True
+        )
+        shutil.copy2(str(local_file_path), str(dest))

@@ -83,7 +83,7 @@ class BaseArtifactStorage(ABC):
         pass
 
     # =====================================
-    # LOCAL ACCESS
+    # LOCAL ACCESS & STREAMING
     # =====================================
 
     @abstractmethod
@@ -93,3 +93,11 @@ class BaseArtifactStorage(ABC):
             workspace_dir: str
     ) -> str:
         pass
+
+    @abstractmethod
+    async def upload_file(
+        self,
+        remote_path: str,
+        local_file_path: str
+    ):
+        pass

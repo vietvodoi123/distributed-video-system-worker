@@ -94,6 +94,12 @@ class GenerateVideoExecutor(
                 + ", ".join(missing)
             )
 
+        # Ensure segments are sorted strictly by line_index
+        segments = sorted(
+            segments,
+            key=lambda s: int(s.get("line_index", 0))
+        )
+
         # =====================================
         # LOCAL ARTIFACTS
         # =====================================
@@ -279,13 +285,19 @@ class GenerateVideoExecutor(
             )
 
         # =====================================
-        # UPLOAD FINAL ARTIFACT
+        # UPLOAD FINAL ARTIFACT (STREAMING)
         # =====================================
 
-        await storage.write_bytes(
-            runtime_context.final_video_path,
-            final_output.read_bytes()
-        )
+        if hasattr(storage, "upload_file"):
+            await storage.upload_file(
+                runtime_context.final_video_path,
+                str(final_output)
+            )
+        else:
+            await storage.write_bytes(
+                runtime_context.final_video_path,
+                final_output.read_bytes()
+            )
 
         print(
             "[GenerateVideoExecutor] "

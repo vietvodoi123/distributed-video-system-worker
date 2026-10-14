@@ -1,3 +1,4 @@
+import asyncio
 from pathlib import Path
 import re
 import time
@@ -126,17 +127,18 @@ class MergeBatchVideosExecutor(
         )
 
         # =====================================
-        # MATERIALIZE LOCAL FILES
+        # MATERIALIZE LOCAL FILES (PARALLEL)
         # =====================================
 
-        local_video_paths = []
+        print(
+            f"[MergeBatchVideosExecutor] "
+            f"Downloading {len(sorted_video_paths)} videos in parallel..."
+        )
 
-        for remote_video_path in sorted_video_paths:
-
-
+        async def _fetch_single_video(remote_path: str) -> Path:
             local_path = Path(
                 await storage.get_local_path(
-                    remote_video_path,
+                    remote_path,
                     runtime_context.workspace_dir,
                 )
             )
@@ -151,7 +153,13 @@ class MergeBatchVideosExecutor(
                     f"Video file is empty: {local_path}"
                 )
 
-            local_video_paths.append(local_path)
+            return local_path
+
+        local_video_paths = list(
+            await asyncio.gather(
+                *[_fetch_single_video(p) for p in sorted_video_paths]
+            )
+        )
 
         # =====================================
         # CONCAT FILE
@@ -208,6 +216,10 @@ class MergeBatchVideosExecutor(
             "-hide_banner",
             "-loglevel",
             "info",
+            "-fflags",
+            "+genpts",
+            "-avoid_negative_ts",
+            "make_zero",
             "-f",
             "concat",
             "-safe",
@@ -243,13 +255,19 @@ class MergeBatchVideosExecutor(
             )
 
         # =====================================
-        # UPLOAD
+        # UPLOAD (STREAMING)
         # =====================================
 
-        await storage.write_bytes(
-            remote_output,
-            local_output.read_bytes(),
-        )
+        if hasattr(storage, "upload_file"):
+            await storage.upload_file(
+                remote_output,
+                str(local_output),
+            )
+        else:
+            await storage.write_bytes(
+                remote_output,
+                local_output.read_bytes(),
+            )
 
         print(
             "[MergeBatchVideosExecutor] "

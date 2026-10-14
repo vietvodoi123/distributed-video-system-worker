@@ -262,7 +262,7 @@ class MinioArtifactStorage(
         return
 
     # =====================================
-    # GET LOCAL PATH
+    # GET LOCAL PATH & STREAMING
     # =====================================
 
     async def get_local_path(
@@ -271,23 +271,47 @@ class MinioArtifactStorage(
             workspace_dir: str
     ) -> str:
 
-        data = await self.read_bytes(
-            path
-        )
-
         local_path = (
                 Path(workspace_dir)
                 / "downloads"
                 / path
         )
 
+        if local_path.exists() and local_path.stat().st_size > 0:
+            return str(local_path)
+
         local_path.parent.mkdir(
             parents=True,
             exist_ok=True
         )
 
-        local_path.write_bytes(
-            data
-        )
+        try:
+            self.client.fget_object(
+                self.bucket,
+                path,
+                str(local_path)
+            )
+        except Exception:
+            # Fallback if fget_object fails
+            data = await self.read_bytes(path)
+            local_path.write_bytes(data)
 
         return str(local_path)
+
+    async def upload_file(
+        self,
+        remote_path: str,
+        local_file_path: str
+    ):
+        local_file = Path(local_file_path)
+        if not local_file.exists():
+            raise FileNotFoundError(f"Local file not found for upload: {local_file}")
+
+        content_type = "video/mp4" if str(local_file).endswith(".mp4") else "application/octet-stream"
+
+        self.client.fput_object(
+            self.bucket,
+            remote_path,
+            str(local_file.resolve()),
+            content_type=content_type
+        )
