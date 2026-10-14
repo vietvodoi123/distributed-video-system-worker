@@ -2,53 +2,37 @@ import json
 import subprocess
 from pathlib import Path
 
+from shared.config.settings import settings
 from shared.runtime.executors.base.base_task_executor import (
     BaseTaskExecutor
 )
-
 from shared.runtime.contexts.chapter_runtime_context import (
     ChapterRuntimeContext
 )
-
 from shared.runtime.static_assets.mc_loop.mc_loop_asset_manager import (
     McLoopAssetManager
 )
-
 from shared.runtime.static_assets.text_scroll.text_scroll_asset_manager import (
     TextScrollAssetManager
 )
-
 from shared.runtime.executors.video.services.video_layer_composer import (
     VideoLayerComposer,
     OverlayLayer
 )
-
 from shared.runtime.templates.reddit_story.python.html_template_renderer import (
     render_template
 )
-
 from shared.runtime.templates.reddit_story.python.generate_concat_txt import (
     generate_frames_concat_from_segments
 )
-
-from shared.runtime.templates.reddit_story.python.render_video import (
-    create_video_from_concat
-)
-
-
 from shared.runtime.artifacts.artifact_paths import (
     get_project_root
-)
-
-from shared.utils.run_ffmpeg_with_progress import (
-    run_ffmpeg_with_progress
 )
 
 
 class GenerateVideoExecutor(
     BaseTaskExecutor
 ):
-
 
     async def execute(
         self,
@@ -80,7 +64,6 @@ class GenerateVideoExecutor(
         channel_id = payload.get("channel_id")
         channel_subs = payload.get("channel_subs")
         channel_avatar_url = payload.get("channel_avatar_url")
-
 
         required = {
             "title": title,
@@ -127,35 +110,22 @@ class GenerateVideoExecutor(
             workspace / "concat.txt"
         )
 
-        template_output = (
-            workspace / "template.mp4"
-        )
-
-        text_scroll_output = (
-            workspace / "text_scroll.mp4"
-        )
-
-        mc_loop_output = (
-            workspace / "mc_loop.mp4"
-        )
-
-        composited_output = (
-            workspace / "composited.mp4"
-        )
-
         final_output = (
             workspace / "final.mp4"
         )
 
         # =====================================
-        # 1. RENDER TEMPLATE
+        # 1. RENDER TEMPLATE FRAMES (PUPPETEER)
         # =====================================
 
-        print(
-            "[GenerateVideoExecutor] "
-            "Step 1/5 - Rendering template"
-        )
+        vr = getattr(settings, "video_render", None)
+        num_workers = vr.num_workers if vr else 2
+        jpeg_quality = vr.frame_jpeg_quality if vr else 70
 
+        print(
+            f"[GenerateVideoExecutor] Step 1/3 - Rendering frames "
+            f"(Workers: {num_workers}, Quality: {jpeg_quality})"
+        )
 
         project_root = get_project_root()
 
@@ -201,7 +171,9 @@ class GenerateVideoExecutor(
                 "node",
                 str(renderer_js),
                 str(frames_dir),
-                str(rendered_html)
+                str(rendered_html),
+                str(num_workers),
+                str(jpeg_quality)
             ],
             input=json.dumps(
                 segments,
@@ -227,115 +199,27 @@ class GenerateVideoExecutor(
             output_concat_path=concat_path
         )
 
-        create_video_from_concat(
-            concat_file=str(concat_path),
-            output_file=str(template_output),
-            fps=8,
-            use_gpu=runtime_context.gpu_available,
-        )
-
-        if not template_output.exists():
-            raise FileNotFoundError(
-                "Template render failed"
-            )
-
         # =====================================
-        # 2. GENERATE TEXT SCROLL
+        # 2. PREPARE STATIC ASSETS & AUDIO
         # =====================================
 
         print(
             "[GenerateVideoExecutor] "
-            "Step 2/5 - Generating text scroll"
+            "Step 2/3 - Preparing layers and narration audio"
         )
 
-        text_scroll_manager = (
-            TextScrollAssetManager()
+        # Text Scroll master video (cached 3600s, stream looped)
+        text_scroll_manager = TextScrollAssetManager()
+        text_scroll_master = text_scroll_manager.ensure_cache_exists()
+
+        # MC video source (cached source, auto looped & scaled in ffmpeg)
+        mc_manager = McLoopAssetManager(
+            mc_path=mc_path,
+            artifact_storage=storage
         )
+        mc_source = await mc_manager.ensure_cache_exists()
 
-        text_scroll_manager.create_duration_variant(
-            duration=duration,
-            output_path=text_scroll_output
-        )
-
-        if not text_scroll_output.exists():
-            raise FileNotFoundError(
-                "Failed to generate text scroll video"
-            )
-
-        # =====================================
-        # 3. GENERATE MC LOOP
-        # =====================================
-
-        print(
-            "[GenerateVideoExecutor] "
-            "Step 3/5 - Generating MC loop"
-        )
-
-        mc_manager = (
-            McLoopAssetManager(
-                mc_path=mc_path,
-                artifact_storage=storage
-            )
-        )
-
-        await mc_manager.create_duration_variant(
-            duration=duration,
-            output_path=mc_loop_output
-        )
-
-        if not mc_loop_output.exists():
-            raise FileNotFoundError(
-                "Failed to generate MC loop video"
-            )
-
-        # =====================================
-        # 4. COMPOSE VIDEO LAYERS
-        # =====================================
-
-        print(
-            "[GenerateVideoExecutor] "
-            "Step 4/5 - Composing video layers"
-        )
-
-        composer = VideoLayerComposer()
-
-        composer.compose(
-            base_video=str(template_output),
-            overlays=[
-                OverlayLayer(
-                    path=str(text_scroll_output),
-                    x=24,
-                    y=590
-                ),
-                OverlayLayer(
-                    path=str(mc_loop_output),
-                    x=961,
-                    y=256
-                )
-            ],
-            output_path=str(composited_output),
-            use_gpu=runtime_context.gpu_available
-        )
-
-        if not composited_output.exists():
-            raise FileNotFoundError(
-                "Compose render failed"
-            )
-
-        if composited_output.stat().st_size <= 0:
-            raise ValueError(
-                "Composited video empty"
-            )
-
-        # =====================================
-        # 5. MERGE AUDIO
-        # =====================================
-
-        print(
-            "[GenerateVideoExecutor] "
-            "Step 5/5 - Merging narration audio"
-        )
-
+        # Narration audio
         local_audio = Path(
             await storage.get_local_path(
                 audio_input,
@@ -348,33 +232,37 @@ class GenerateVideoExecutor(
                 f"Missing narration audio: {local_audio}"
             )
 
-        cmd = [
-            "ffmpeg",
-            "-y",
-            "-hide_banner",
-            "-loglevel",
-            "info",
-            "-i",
-            str(composited_output),
-            "-i",
-            str(local_audio),
-            "-map",
-            "0:v",
-            "-map",
-            "1:a",
-            "-c:v",
-            "copy",
-            "-c:a",
-            "aac",
-            "-b:a",
-            "192k",
-            "-shortest",
-            "-movflags",
-            "+faststart",
-            str(final_output)
-        ]
+        # =====================================
+        # 3. 1-PASS COMPOSITING (ALL-IN-ONE)
+        # =====================================
 
-        run_ffmpeg_with_progress(cmd)
+        print(
+            "[GenerateVideoExecutor] "
+            "Step 3/3 - 1-Pass Direct Rendering to final.mp4"
+        )
+
+        composer = VideoLayerComposer()
+
+        composer.compose(
+            base_video=str(concat_path),
+            overlays=[
+                OverlayLayer(
+                    path=str(text_scroll_master),
+                    x=24,
+                    y=590
+                ),
+                OverlayLayer(
+                    path=str(mc_source),
+                    x=961,
+                    y=256,
+                    width=264,
+                    height=-1
+                )
+            ],
+            audio_path=str(local_audio),
+            output_path=str(final_output),
+            use_gpu=runtime_context.gpu_available
+        )
 
         # =====================================
         # VALIDATE FINAL OUTPUT
@@ -391,7 +279,7 @@ class GenerateVideoExecutor(
             )
 
         # =====================================
-        # UPLOAD ONLY FINAL ARTIFACT
+        # UPLOAD FINAL ARTIFACT
         # =====================================
 
         await storage.write_bytes(
@@ -413,4 +301,4 @@ class GenerateVideoExecutor(
             "output_path": (
                 runtime_context.final_video_path
             )
-        }
+        }

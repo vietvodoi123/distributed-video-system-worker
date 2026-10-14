@@ -1,6 +1,7 @@
 
 import subprocess
 from pathlib import Path
+from shared.config.settings import settings
 
 
 def create_video_from_concat(
@@ -8,19 +9,29 @@ def create_video_from_concat(
     output_file: str,
     fps: int = 8,
     codec: str = "libx264",
-    preset: str = "medium",
-    crf: int = 18,
+    preset: str | None = None,
+    crf: int | None = None,
     use_gpu: bool = False,
 ):
     """
     Render MP4 video from FFmpeg concat.txt.
-
-    Khi use_gpu=True:
-        Sử dụng NVIDIA NVENC (h264_nvenc) để encode video.
-
-    Khi use_gpu=False:
-        Giữ nguyên libx264 như behavior hiện tại.
+    Tự động áp dụng tối ưu hóa từ settings.video_render (ưu tiên Speed > Quality).
     """
+
+    vr = getattr(settings, "video_render", None)
+    if vr:
+        if vr.acceleration == "nvenc":
+            use_gpu = True
+        elif vr.acceleration == "cpu":
+            use_gpu = False
+
+    nvenc_preset = vr.nvenc_preset if vr else "p1"
+    nvenc_cq = vr.nvenc_cq if vr else 27
+    cpu_preset = preset or (vr.cpu_preset if vr else "ultrafast")
+    cpu_crf = crf or (vr.cpu_crf if vr else 27)
+    target_bitrate = vr.target_bitrate if vr else "2M"
+    max_bitrate = vr.max_bitrate if vr else "3M"
+    bufsize = vr.bufsize if vr else "6M"
 
     concat_file = Path(concat_file)
     output_file = Path(output_file)
@@ -91,46 +102,43 @@ def create_video_from_concat(
             "-c:v",
             "h264_nvenc",
 
-            # NVENC preset:
-            # p1 = fastest
-            # p4 = balanced
-            # p5 = better quality
             "-preset",
-            "p4",
+            nvenc_preset,
 
             "-pix_fmt",
             "yuv420p",
 
-            # Constant quality mode
             "-rc",
             "vbr",
 
             "-cq",
-            str(crf),
+            str(nvenc_cq),
 
-            # Giới hạn bitrate để tránh bitrate tăng quá cao
             "-b:v",
-            "4M",
+            target_bitrate,
 
             "-maxrate",
-            "6M",
+            max_bitrate,
 
             "-bufsize",
-            "12M",
+            bufsize,
         ]
 
     else:
 
         # CPU / libx264
         cmd += [
+            "-threads",
+            "0",
+
             "-c:v",
             codec,
 
             "-preset",
-            preset,
+            cpu_preset,
 
             "-crf",
-            str(crf),
+            str(cpu_crf),
         ]
 
     # =====================================

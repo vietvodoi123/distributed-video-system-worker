@@ -56,6 +56,18 @@ class TranslationSetting(BaseModel):
 class ttsSetting(BaseModel):
     tts_model: str
 
+class VideoRenderSetting(BaseModel):
+    num_workers: int = 2
+    frame_jpeg_quality: int = 70
+    acceleration: str = "auto"
+    nvenc_preset: str = "p1"
+    nvenc_cq: int = 27
+    cpu_preset: str = "ultrafast"
+    cpu_crf: int = 27
+    target_bitrate: str = "2M"
+    max_bitrate: str = "3M"
+    bufsize: str = "6M"
+
 class Settings(BaseModel):
     minio: MinioSettings
     worker: WorkerSettings
@@ -68,6 +80,7 @@ class Settings(BaseModel):
     capabilities: list[str]
     translation: TranslationSetting
     tts: ttsSetting
+    video_render: VideoRenderSetting = VideoRenderSetting()
 
     @classmethod
     def load(cls, path: str | Path):

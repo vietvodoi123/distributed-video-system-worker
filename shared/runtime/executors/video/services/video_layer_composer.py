@@ -1,6 +1,6 @@
 
 from dataclasses import dataclass
-
+from shared.config.settings import settings
 from shared.utils.run_ffmpeg_with_progress import (
     run_ffmpeg_with_progress
 )
@@ -32,12 +32,34 @@ class VideoLayerComposer:
 
         output_path: str,
 
-        use_gpu: bool = False
-    ):
+        use_gpu: bool = False,
 
-        inputs = [
-            "-i", str(base_video)
-        ]
+        audio_path: str | None = None
+    ):
+        vr = getattr(settings, "video_render", None)
+        if vr:
+            if vr.acceleration == "nvenc":
+                use_gpu = True
+            elif vr.acceleration == "cpu":
+                use_gpu = False
+
+        nvenc_preset = vr.nvenc_preset if vr else "p1"
+        nvenc_cq = vr.nvenc_cq if vr else 27
+        cpu_preset = vr.cpu_preset if vr else "ultrafast"
+        cpu_crf = vr.cpu_crf if vr else 27
+        target_bitrate = vr.target_bitrate if vr else "2M"
+        max_bitrate = vr.max_bitrate if vr else "3M"
+        bufsize = vr.bufsize if vr else "6M"
+
+        # =====================================
+        # INPUTS
+        # =====================================
+
+        base_str = str(base_video)
+        if base_str.endswith(".txt"):
+            inputs = ["-f", "concat", "-safe", "0", "-i", base_str]
+        else:
+            inputs = ["-i", base_str]
 
         filter_parts = []
 
@@ -83,14 +105,16 @@ class VideoLayerComposer:
 
             if (
                 layer.width is not None
-                and
+                or
                 layer.height is not None
             ):
+                w = layer.width if layer.width is not None else -1
+                h = layer.height if layer.height is not None else -1
 
                 chain += (
                     f",scale="
-                    f"{layer.width}:"
-                    f"{layer.height}"
+                    f"{w}:"
+                    f"{h}"
                 )
 
             # =================================
@@ -151,6 +175,16 @@ class VideoLayerComposer:
         )
 
         # =====================================
+        # AUDIO INPUT (IF PROVIDED)
+        # =====================================
+
+        if audio_path:
+            inputs.extend([
+                "-i", str(audio_path)
+            ])
+            audio_index = len(overlays) + 1
+
+        # =====================================
         # COMMAND
         # =====================================
 
@@ -161,7 +195,7 @@ class VideoLayerComposer:
             "-y",
 
             "-loglevel",
-            "verbose",
+            "info",
 
             "-fflags",
             "+genpts",
@@ -178,6 +212,20 @@ class VideoLayerComposer:
             "[vout]"
         ]
 
+        if audio_path:
+            cmd.extend([
+                "-map",
+                f"{audio_index}:a",
+
+                "-c:a",
+                "aac",
+
+                "-b:a",
+                "192k",
+
+                "-shortest"
+            ])
+
         # =====================================
         # ENCODER
         # =====================================
@@ -193,9 +241,8 @@ class VideoLayerComposer:
                 "-c:v",
                 "h264_nvenc",
 
-                # Balanced NVENC preset
                 "-preset",
-                "p4",
+                nvenc_preset,
 
                 "-profile:v",
                 "high",
@@ -207,16 +254,16 @@ class VideoLayerComposer:
                 "vbr",
 
                 "-cq",
-                "23",
+                str(nvenc_cq),
 
                 "-b:v",
-                "4M",
+                target_bitrate,
 
                 "-maxrate",
-                "6M",
+                max_bitrate,
 
                 "-bufsize",
-                "12M"
+                bufsize
             ]
 
         else:
@@ -234,10 +281,10 @@ class VideoLayerComposer:
                 "libx264",
 
                 "-preset",
-                "veryfast",
+                cpu_preset,
 
                 "-crf",
-                "23",
+                str(cpu_crf),
 
                 "-pix_fmt",
                 "yuv420p"

@@ -77,7 +77,11 @@ fs.mkdirSync(frameDir, {
 // CONFIG
 // ========================================
 
-const NUM_WORKERS = 1;
+const argWorkers = parseInt(process.argv[4], 10);
+const NUM_WORKERS = (!isNaN(argWorkers) && argWorkers > 0) ? argWorkers : 2;
+
+const argQuality = parseInt(process.argv[5], 10);
+const JPEG_QUALITY = (!isNaN(argQuality) && argQuality > 0 && argQuality <= 100) ? argQuality : 70;
 
 const CHROME_PATH =
   "C:/Program Files/Google/Chrome/Application/chrome.exe";
@@ -210,10 +214,21 @@ async function createBrowser() {
 
       "--disable-renderer-backgrounding",
 
+      "--disable-background-timer-throttling",
+
+      "--disable-breakpad",
+
+      "--disable-component-update",
+
+      "--disable-extensions",
+
+      "--font-render-hinting=none",
+
       "--mute-audio",
     ],
   });
 }
+
 
 // ========================================
 // WORKER
@@ -506,7 +521,7 @@ async function renderWorker(tasks, indexedSegments) {
 
           type: "jpeg",
 
-          quality: 85,
+          quality: JPEG_QUALITY,
 
           optimizeForSpeed: true,
 
@@ -617,15 +632,20 @@ async function renderWorker(tasks, indexedSegments) {
     // CREATE WORKER CHUNKS
     // ======================================
 
+    const actualWorkers = Math.max(1, Math.min(NUM_WORKERS, indexedSegments.length));
+    console.log(
+      `[Renderer] Spawning ${actualWorkers} worker(s) (configured: ${NUM_WORKERS}, JPEG quality: ${JPEG_QUALITY})`
+    );
+
     const chunked = Array.from(
       {
-        length: NUM_WORKERS,
+        length: actualWorkers,
       },
       () => [],
     );
 
     indexedSegments.forEach((segment, i) => {
-      chunked[i % NUM_WORKERS].push(segment);
+      chunked[i % actualWorkers].push(segment);
     });
 
     // ======================================
@@ -638,8 +658,10 @@ async function renderWorker(tasks, indexedSegments) {
     // RUN WORKERS
     // ======================================
 
+    const activeChunks = chunked.filter((tasks) => tasks.length > 0);
+
     await Promise.all(
-      chunked.map((tasks) =>
+      activeChunks.map((tasks) =>
         renderWorker(
           tasks,
           indexedSegments,
