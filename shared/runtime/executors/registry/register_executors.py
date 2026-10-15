@@ -30,9 +30,17 @@ from shared.runtime.executors.audio.service.tts_service import TTSService
 
 from shared.contracts.enums.task_types import *
 
-def register_executors(gpu_available,model_path, config_path):
+from shared.config.settings import settings
 
-    tts_service = TTSService(model_path=model_path,config_path=config_path,use_cuda=gpu_available)
+def register_executors(gpu_available, model_path, config_path):
+
+    max_concurrency = getattr(settings.tts, "max_concurrency", 3)
+    tts_service = TTSService(
+        model_path=model_path,
+        config_path=config_path,
+        use_cuda=gpu_available,
+        max_concurrency=max_concurrency,
+    )
 
     TaskExecutorRegistry.register(
         AUDIO,

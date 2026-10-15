@@ -111,18 +111,19 @@ class AudioExecutor(
         # TTS OPTIONS
         # =====================================
 
+        from shared.config.settings import settings
+        payload = getattr(task, "payload", {}) or {}
+        speed = payload.get("speed", getattr(settings.tts, "default_speed", 1.0))
+
         options = TTSOptions(
-            speed=1.5,
+            speed=speed,
             volume=1.0,
             sentence_silence=0.0,
         )
 
-
         # =====================================
-        # GENERATE TTS
+        # GENERATE TTS (SHARED WORKER-LEVEL SEMAPHORE)
         # =====================================
-
-        tts_semaphore = asyncio.Semaphore(5)
 
         async def synthesize_line(
                 line_index: int,
@@ -130,16 +131,14 @@ class AudioExecutor(
         ):
             output_file = (
                     Path(runtime_context.workspace_dir)
-                    / f"tts_line_{line_index}.wav"
+                    / f"tts_line_{line_index:04d}.wav"
             )
 
-            async with tts_semaphore:
-                result = await asyncio.to_thread(
-                    self.tts_service.synthesize_text,
-                    text=line_text,
-                    output_file=output_file,
-                    options=options,
-                )
+            result = await self.tts_service.synthesize_text_async(
+                text=line_text,
+                output_file=output_file,
+                options=options,
+            )
 
             return {
                 "line_index": line_index,
@@ -182,20 +181,23 @@ class AudioExecutor(
         await concat_wav_files(
             input_files=segment_files,
             output_file=merged_local_path,
-            workspace_dir=runtime_context.workspace_dir,
+            workspace_dir=Path(runtime_context.workspace_dir),
             use_gpu=runtime_context.gpu_available,
+            apply_loudnorm=False,
         )
 
         # =====================================
         # READ MERGED
         # =====================================
 
-        with open(
-            merged_local_path,
-            "rb",
-        ) as f:
+        def read_file_bytes(p: str) -> bytes:
+            with open(p, "rb") as f:
+                return f.read()
 
-            merged_bytes = f.read()
+        merged_bytes = await asyncio.to_thread(
+            read_file_bytes,
+            merged_local_path,
+        )
 
         # =====================================
         # UPLOAD

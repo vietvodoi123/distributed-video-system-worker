@@ -15,6 +15,9 @@ class MinioSettings(BaseModel):
 class WorkerSettings(BaseModel):
     poll_interval: int
     task_lease_seconds: int
+    max_slots: int = 2
+    max_audio_slots: int = 2
+    max_video_slots: int = 1
 
 
 class ApiSettings(BaseModel):
@@ -55,6 +58,8 @@ class TranslationSetting(BaseModel):
 
 class ttsSetting(BaseModel):
     tts_model: str
+    max_concurrency: int = 20
+    default_speed: float = 1.2
 
 class VideoRenderSetting(BaseModel):
     num_workers: int = 2

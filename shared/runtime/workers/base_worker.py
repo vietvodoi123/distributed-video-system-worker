@@ -92,12 +92,22 @@ class BaseWorker(ABC):
         self.running_tasks: set[str] = set()
         self.running_tasks_lock = asyncio.Lock()
 
+        self.max_slots = getattr(settings.worker, "max_slots", 2)
         self.general_semaphore = (
-            asyncio.Semaphore(2)
+            asyncio.Semaphore(self.max_slots)
+        )
+
+        self.max_audio_slots = getattr(settings.worker, "max_audio_slots", 2)
+        self.audio_semaphore = (
+            asyncio.Semaphore(self.max_audio_slots)
+        )
+
+        self.max_video_slots = getattr(settings.worker, "max_video_slots", 1)
+        self.video_semaphore = (
+            asyncio.Semaphore(self.max_video_slots)
         )
 
         self.inflight_tasks: set[asyncio.Task] = set()
-        self.max_slots = 2
 
     def available_slots(self) -> int:
         return max(
@@ -228,6 +238,11 @@ class BaseWorker(ABC):
     # ======================================
 
     def get_semaphore_for_task(self, task_type):
+        from shared.contracts.enums.task_types import AUDIO, VIDEO, MERGE_BATCH_VIDEO
+        if task_type == AUDIO:
+            return self.audio_semaphore
+        if task_type in (VIDEO, MERGE_BATCH_VIDEO):
+            return self.video_semaphore
         return self.general_semaphore
 
     # ======================================

@@ -1,8 +1,11 @@
+import asyncio
+import threading
 from pathlib import Path
 from typing import Optional
 import wave
 
 from piper.voice import PiperVoice
+from piper.config import SynthesisConfig
 
 from .models import (
     TTSOptions,
@@ -18,6 +21,7 @@ class TTSService:
         model_path: str | Path,
         config_path: str | Path | None = None,
         use_cuda: bool = False,
+        max_concurrency: int = 3,
     ):
         self.model_path = Path(model_path)
 
@@ -39,6 +43,33 @@ class TTSService:
         self.sample_rate = (
             self._voice.config.sample_rate
         )
+        self.max_concurrency = max_concurrency
+        self._inference_lock = threading.Lock()
+        self._async_semaphore: Optional[asyncio.Semaphore] = None
+
+    def _get_semaphore(self) -> asyncio.Semaphore:
+        if self._async_semaphore is None:
+            self._async_semaphore = asyncio.Semaphore(self.max_concurrency)
+        return self._async_semaphore
+
+    async def synthesize_text_async(
+        self,
+        *,
+        text: str,
+        output_file: str | Path,
+        options: Optional[TTSOptions] = None,
+    ) -> TTSResult:
+        """
+        Thread-safe async synthesis bounded by worker-level shared concurrency semaphore.
+        """
+        semaphore = self._get_semaphore()
+        async with semaphore:
+            return await asyncio.to_thread(
+                self.synthesize_text,
+                text=text,
+                output_file=output_file,
+                options=options,
+            )
 
     def synthesize_text(
         self,
@@ -68,6 +99,23 @@ class TTSService:
             exist_ok=True,
         )
 
+        # Calculate length_scale from speed (e.g. speed=1.5 -> length_scale=0.667)
+        length_scale = 1.0 / options.speed if options.speed > 0 else 1.0
+
+        syn_config = SynthesisConfig(
+            length_scale=length_scale,
+            volume=options.volume,
+        )
+
+        # Thread-safe ONNX inference
+        with self._inference_lock:
+            chunks = list(
+                self._voice.synthesize(
+                    text,
+                    syn_config=syn_config,
+                )
+            )
+
         frame_count = 0
 
         with wave.open(
@@ -81,7 +129,7 @@ class TTSService:
                 self.sample_rate
             )
 
-            for chunk in self._voice.synthesize(text):
+            for chunk in chunks:
                 wav.writeframes(
                     chunk.audio_int16_bytes
                 )
@@ -90,6 +138,15 @@ class TTSService:
                     len(chunk.audio_int16_bytes)
                     // 2
                 )
+
+            # Optional sentence silence padding
+            if options.sentence_silence > 0:
+                silence_frames = int(
+                    options.sentence_silence * self.sample_rate
+                )
+                if silence_frames > 0:
+                    wav.writeframes(b"\x00\x00" * silence_frames)
+                    frame_count += silence_frames
 
         duration = (
             frame_count
@@ -104,5 +161,5 @@ class TTSService:
             frame_count=frame_count,
             duration=duration,
             speed=options.speed,
-            length_scale=1.0,
-        )
+            length_scale=length_scale,
+        )
