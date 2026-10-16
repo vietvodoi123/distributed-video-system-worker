@@ -99,22 +99,33 @@ class TTSService:
             exist_ok=True,
         )
 
-        # Calculate length_scale from speed (e.g. speed=1.5 -> length_scale=0.667)
-        length_scale = 1.0 / options.speed if options.speed > 0 else 1.0
-
-        syn_config = SynthesisConfig(
-            length_scale=length_scale,
-            volume=options.volume,
-        )
+        # If speed is 1.0 (default), call synthesize natively without syn_config.
+        # This preserves 100% original model phonemization, timing, and audio fidelity.
+        if abs(options.speed - 1.0) < 1e-3:
+            syn_config = None
+            length_scale = 1.0
+        else:
+            length_scale = 1.0 / options.speed if options.speed > 0 else 1.0
+            syn_config = SynthesisConfig(
+                length_scale=length_scale,
+                volume=options.volume,
+            )
 
         # Thread-safe ONNX inference
         with self._inference_lock:
-            chunks = list(
-                self._voice.synthesize(
-                    text,
-                    syn_config=syn_config,
+            if syn_config is not None:
+                chunks = list(
+                    self._voice.synthesize(
+                        text,
+                        syn_config=syn_config,
+                    )
                 )
-            )
+            else:
+                chunks = list(
+                    self._voice.synthesize(
+                        text,
+                    )
+                )
 
         frame_count = 0
 
@@ -147,6 +158,12 @@ class TTSService:
                 if silence_frames > 0:
                     wav.writeframes(b"\x00\x00" * silence_frames)
                     frame_count += silence_frames
+
+            # Fallback for punctuation-only or silent lines to avoid 0-byte audio
+            if frame_count == 0:
+                silence_frames = int(0.1 * self.sample_rate)
+                wav.writeframes(b"\x00\x00" * silence_frames)
+                frame_count = silence_frames
 
         duration = (
             frame_count
