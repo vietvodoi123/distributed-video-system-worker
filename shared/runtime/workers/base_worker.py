@@ -33,6 +33,8 @@ from shared.config.settings import settings
 from shared.runtime.workers.services.worker_api_client import (
     WorkerApiClient
 )
+
+
 # ==========================================
 # BASE WORKER
 # ==========================================
@@ -41,26 +43,37 @@ class BaseWorker(ABC):
 
     capabilities: list[str] = []
 
-    poll_interval: int = settings.worker.poll_interval
+    poll_interval: int = getattr(settings, "WORKER_POLL_INTERVAL", getattr(settings.worker, "poll_interval", 5))
 
     max_batch_size: int = 1
-
 
     # ======================================
     # INIT
     # ======================================
 
-    def __init__(self,model_path,config_path):
+    def __init__(self, model_path, config_path):
 
-        self.worker_id = str(
-            uuid.uuid4()
+        self.worker_id = (
+            getattr(settings, "WORKER_ID", None)
+            or str(uuid.uuid4())
         )
         self.resource_capacity = (
-            WorkerResourceProfiler
-            .detect()
+            WorkerResourceProfiler.detect()
         )
         self.gpu_available = (
             WorkerResourceProfiler.detect_gpu()
+        )
+        self.worker_type = (
+            getattr(settings, "WORKER_TYPE", None)
+            or ("gpu" if self.gpu_available else "cpu")
+        )
+        print(
+            "[BaseWorker] Worker ID:",
+            self.worker_id
+        )
+        print(
+            "[BaseWorker] Worker Type:",
+            self.worker_type
         )
         print(
             "[BaseWorker] GPU Available:",
@@ -68,9 +81,7 @@ class BaseWorker(ABC):
         )
         self.api = WorkerApiClient()
         print(
-
             "[BaseWorker] Resource Capacity:",
-
             self.resource_capacity.to_dict()
         )
 
@@ -82,8 +93,7 @@ class BaseWorker(ABC):
             self.create_artifact_storage()
         )
 
-
-        register_executors(WorkerResourceProfiler.detect_gpu(),model_path,config_path)
+        register_executors(self.gpu_available, model_path, config_path)
 
         # ==================================
         # CONCURRENCY CONTROL
@@ -114,6 +124,7 @@ class BaseWorker(ABC):
             0,
             self.max_slots - len(self.inflight_tasks)
         )
+
     # ======================================
     # STORAGE
     # ======================================
@@ -149,11 +160,17 @@ class BaseWorker(ABC):
             f"{self.capabilities}"
         )
 
+        heartbeat_task = asyncio.create_task(
+            self.heartbeat_loop()
+        )
+
         lease_task = asyncio.create_task(
             self.lease_loop()
         )
 
         try:
+            # Send initial registration heartbeat immediately
+            await self.send_heartbeat()
 
             while True:
 
@@ -173,13 +190,45 @@ class BaseWorker(ABC):
 
         finally:
 
+            heartbeat_task.cancel()
             lease_task.cancel()
 
             try:
-                await lease_task
-
+                await heartbeat_task
             except asyncio.CancelledError:
                 pass
+
+            try:
+                await lease_task
+            except asyncio.CancelledError:
+                pass
+
+    # ======================================
+    # HEARTBEAT LOOP
+    # ======================================
+
+    async def send_heartbeat(self):
+        try:
+            await self.api.heartbeat(
+                worker_id=self.worker_id,
+                worker_type=self.worker_type,
+                capabilities=self.capabilities,
+                max_concurrency=self.max_slots,
+                free_slots=self.available_slots(),
+            )
+        except Exception as e:
+            print(f"[BaseWorker] Heartbeat send error: {e}")
+
+    async def heartbeat_loop(self):
+        while True:
+            try:
+                await asyncio.sleep(15)
+                await self.send_heartbeat()
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                print(f"[BaseWorker] Heartbeat loop error: {e}")
+                await asyncio.sleep(5)
 
     # ======================================
     # POLL
@@ -189,9 +238,10 @@ class BaseWorker(ABC):
 
         response = await self.api.claim_tasks(
             worker_id=self.worker_id,
-            worker_type=self.__class__.__name__,
+            worker_type=self.worker_type,
             capabilities=self.capabilities,
             available_slots=self.available_slots(),
+            resource_capacity=self.resource_capacity.to_dict(),
         )
 
         tasks = response.get(
@@ -210,9 +260,7 @@ class BaseWorker(ABC):
             return
 
         print(
-
             "[BaseWorker]",
-
             f"Claimed {len(tasks)} tasks",
         )
 
@@ -368,7 +416,6 @@ class BaseWorker(ABC):
             # ==================================
 
             await self.api.complete_task(
-
                 worker_id=
                 self.worker_id,
 
@@ -392,20 +439,15 @@ class BaseWorker(ABC):
         except Exception as e:
 
             print(
-
                 "[BaseWorker] "
-
                 f"Task failed: "
-
                 f"{task.id if task else 'unknown'}"
-
             )
 
             traceback.print_exc()
 
             if task:
                 await self.api.fail_task(
-
                     worker_id=
                     self.worker_id,
 
@@ -466,7 +508,7 @@ class BaseWorker(ABC):
                         f"{response.get('requested', len(task_ids))}"
                     )
 
-                await asyncio.sleep(30)
+                await asyncio.sleep(10)
 
             except asyncio.CancelledError:
 
@@ -481,4 +523,3 @@ class BaseWorker(ABC):
                 )
 
                 await asyncio.sleep(5)
-

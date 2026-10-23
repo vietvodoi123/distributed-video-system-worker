@@ -1,28 +1,29 @@
+import os
 from pathlib import Path
-
+from dotenv import load_dotenv
 import yaml
 from pydantic import BaseModel
 
 
 class MinioSettings(BaseModel):
-    endpoint: str
-    access_key: str
-    secret_key: str
-    bucket: str
-    secure: bool
+    endpoint: str = ""
+    access_key: str = ""
+    secret_key: str = ""
+    bucket: str = ""
+    secure: bool = False
 
 
 class WorkerSettings(BaseModel):
-    poll_interval: int
-    task_lease_seconds: int
+    poll_interval: int = 5
+    task_lease_seconds: int = 30
     max_slots: int = 2
     max_audio_slots: int = 2
     max_video_slots: int = 1
 
 
 class ApiSettings(BaseModel):
-    base_url: str
-    translate_moxhi: str
+    base_url: str = "http://192.168.1.147:8000"
+    translate_moxhi: str = "http://192.168.1.147:8090"
 
 
 class RunwareSettings(BaseModel):
@@ -42,24 +43,30 @@ class GeminiSettings(BaseModel):
 class LLMSettings(BaseModel):
     gemini: GeminiSettings
 
+
 class YoutubeSettings(BaseModel):
     client_secret_file: str
-    token_dir:str
+    token_dir: str
     api_key: str
+
 
 class FontSetting(BaseModel):
     font_path: str
 
+
 class OpenAiSetting(BaseModel):
     open_ai_api_key: str
+
 
 class TranslationSetting(BaseModel):
     chunk_max_chars: int
 
+
 class ttsSetting(BaseModel):
     tts_model: str
-    max_concurrency: int = 20
+    max_concurrency: int = 10
     default_speed: float = 1.2
+
 
 class VideoRenderSetting(BaseModel):
     num_workers: int = 2
@@ -73,24 +80,77 @@ class VideoRenderSetting(BaseModel):
     max_bitrate: str = "3M"
     bufsize: str = "6M"
 
+
 class Settings(BaseModel):
-    minio: MinioSettings
-    worker: WorkerSettings
-    api: ApiSettings
+    minio: MinioSettings | None = None
+    worker: WorkerSettings = WorkerSettings()
+    api: ApiSettings = ApiSettings()
     runware: RunwareSettings
     llm: LLMSettings
     youtube: YoutubeSettings
     font: FontSetting
     open_ai: OpenAiSetting
-    capabilities: list[str]
+    capabilities: list[str] = []
     translation: TranslationSetting
     tts: ttsSetting
     video_render: VideoRenderSetting = VideoRenderSetting()
 
+    # Worker deployment settings (aligned with master server & .env)
+    API_BASE_URL: str = "http://192.168.1.147:8000"
+    STORAGE_BACKEND: str = "http"
+    STORAGE_ROOT_DIR: str = "storage"
+    WORKER_ID: str = "worker_pc_rtx3060"
+    WORKER_TYPE: str = "gpu"
+    WORKER_POLL_INTERVAL: int = 5
+    TASK_LEASE_SECONDS: int = 30
+
     @classmethod
     def load(cls, path: str | Path):
-        with open(path, "r", encoding="utf-8") as f:
-            data = yaml.safe_load(f)
+        load_dotenv()
+
+        data: dict = {}
+        target_path = Path(path)
+        if target_path.exists():
+            with open(target_path, "r", encoding="utf-8") as f:
+                data = yaml.safe_load(f) or {}
+
+        # Merge environment variables (override yaml)
+        api_base = os.getenv(
+            "API_BASE_URL",
+            data.get("api", {}).get("base_url", "http://192.168.1.147:8000")
+        )
+        storage_backend = os.getenv("STORAGE_BACKEND", "http")
+        storage_root_dir = os.getenv("STORAGE_ROOT_DIR", "storage")
+        worker_id = os.getenv("WORKER_ID", "worker_pc_rtx3060")
+        worker_type = os.getenv("WORKER_TYPE", "gpu")
+        poll_interval = int(os.getenv(
+            "WORKER_POLL_INTERVAL",
+            str(data.get("worker", {}).get("poll_interval", 5))
+        ))
+        lease_seconds = int(os.getenv(
+            "TASK_LEASE_SECONDS",
+            str(data.get("worker", {}).get("task_lease_seconds", 30))
+        ))
+
+        data["API_BASE_URL"] = api_base
+        data["STORAGE_BACKEND"] = storage_backend
+        data["STORAGE_ROOT_DIR"] = storage_root_dir
+        data["WORKER_ID"] = worker_id
+        data["WORKER_TYPE"] = worker_type
+        data["WORKER_POLL_INTERVAL"] = poll_interval
+        data["TASK_LEASE_SECONDS"] = lease_seconds
+
+        if "api" not in data:
+            data["api"] = {}
+        data["api"]["base_url"] = api_base
+
+        if "worker" not in data:
+            data["worker"] = {}
+        data["worker"]["poll_interval"] = poll_interval
+        data["worker"]["task_lease_seconds"] = lease_seconds
+
+        if "runware" in data and os.getenv("RUNWARE_API_KEY"):
+            data["runware"]["api_key"] = os.getenv("RUNWARE_API_KEY")
 
         return cls.model_validate(data)
 

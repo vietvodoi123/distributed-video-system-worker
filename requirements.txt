@@ -3,7 +3,6 @@ python-dotenv
 httpx
 playwright
 bs4
-minio
 pydantic_settings
 pyyaml
 aiohttp
