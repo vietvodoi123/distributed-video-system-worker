@@ -24,6 +24,11 @@ class WorkerSettings(BaseModel):
 class ApiSettings(BaseModel):
     base_url: str = "http://192.168.1.147:8000"
     translate_moxhi: str = "http://192.168.1.147:8090"
+    flaresolverr: str = "http://localhost:8191/v1"
+
+
+class CrawlerSettings(BaseModel):
+    flaresolverr_url: str = "http://localhost:8191/v1"
 
 
 class RunwareSettings(BaseModel):
@@ -85,6 +90,7 @@ class Settings(BaseModel):
     minio: MinioSettings | None = None
     worker: WorkerSettings = WorkerSettings()
     api: ApiSettings = ApiSettings()
+    crawler: CrawlerSettings = CrawlerSettings()
     runware: RunwareSettings | None = None
     llm: LLMSettings | None = None
     youtube: YoutubeSettings | None = None
@@ -119,6 +125,17 @@ class Settings(BaseModel):
             "API_BASE_URL",
             data.get("api", {}).get("base_url", "http://192.168.1.147:8000")
         )
+        translate_moxhi = os.getenv(
+            "TRANSLATE_MOXHI_URL",
+            data.get("api", {}).get("translate_moxhi", "http://192.168.1.147:8090")
+        )
+        flaresolverr_url = os.getenv(
+            "FLARESOLVERR_URL",
+            data.get("crawler", {}).get(
+                "flaresolverr_url",
+                data.get("api", {}).get("flaresolverr", "http://localhost:8191/v1")
+            )
+        )
         storage_backend = os.getenv("STORAGE_BACKEND", "http")
         storage_root_dir = os.getenv("STORAGE_ROOT_DIR", "storage")
         worker_id = os.getenv("WORKER_ID", "worker_pc_rtx3060")
@@ -143,6 +160,23 @@ class Settings(BaseModel):
         if "api" not in data:
             data["api"] = {}
         data["api"]["base_url"] = api_base
+        data["api"]["translate_moxhi"] = translate_moxhi
+        data["api"]["flaresolverr"] = flaresolverr_url
+
+        if "crawler" not in data:
+            data["crawler"] = {}
+        data["crawler"]["flaresolverr_url"] = flaresolverr_url
+
+        if "minio" not in data:
+            data["minio"] = {}
+        if os.getenv("MINIO_ENDPOINT"):
+            data["minio"]["endpoint"] = os.getenv("MINIO_ENDPOINT")
+        if os.getenv("MINIO_ACCESS_KEY"):
+            data["minio"]["access_key"] = os.getenv("MINIO_ACCESS_KEY")
+        if os.getenv("MINIO_SECRET_KEY"):
+            data["minio"]["secret_key"] = os.getenv("MINIO_SECRET_KEY")
+        if os.getenv("MINIO_BUCKET"):
+            data["minio"]["bucket"] = os.getenv("MINIO_BUCKET")
 
         if "worker" not in data:
             data["worker"] = {}

@@ -1,5 +1,7 @@
+import os
 import httpx
 
+from shared.config.settings import settings
 from shared.crawler.base_engine import BaseCrawlerEngine
 
 
@@ -7,12 +9,24 @@ class FlareSolverrEngine(BaseCrawlerEngine):
 
     def __init__(
         self,
-        endpoint: str = "http://100.78.251.94:8191/v1",
+        endpoint: str | None = None,
         session: str | None = None,
         timeout: int = 60000,
         **kwargs
     ):
         super().__init__(**kwargs)
+
+        if not endpoint:
+            endpoint = (
+                os.getenv("FLARESOLVERR_URL")
+                or getattr(getattr(settings, "crawler", None), "flaresolverr_url", None)
+                or getattr(settings.api, "flaresolverr", None)
+                or "http://localhost:8191/v1"
+            )
+
+        endpoint = str(endpoint).strip().rstrip("/")
+        if not endpoint.endswith("/v1"):
+            endpoint = f"{endpoint}/v1"
 
         self.endpoint = endpoint
         self.session = session

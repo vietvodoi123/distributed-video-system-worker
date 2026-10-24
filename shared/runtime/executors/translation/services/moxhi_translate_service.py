@@ -1,18 +1,22 @@
 import httpx
 from shared.config.settings import settings
 
+
 class MoxhiTranslateService:
-
-    BASE_URL = settings.api.translate_moxhi
-
-    TRANSLATE_URL = (
-        f"{BASE_URL}/translate"
-    )
 
     HEADERS = {
         "accept": "application/json",
         "content-type": "application/json",
     }
+
+    def __init__(self, base_url: str | None = None):
+        raw_url = (base_url or settings.api.translate_moxhi or "http://192.168.1.147:8090").strip().rstrip("/")
+        if raw_url.endswith("/translate"):
+            self.TRANSLATE_URL = raw_url
+            self.BASE_URL = raw_url[:-len("/translate")].rstrip("/")
+        else:
+            self.BASE_URL = raw_url
+            self.TRANSLATE_URL = f"{raw_url}/translate"
 
     async def translate(
         self,
