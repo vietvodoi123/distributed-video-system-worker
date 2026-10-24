@@ -17,6 +17,10 @@ from shared.runtime.contexts.chapter_runtime_context import (
 
 from shared.crawler.engine_factory import EngineFactory
 from shared.text.cleaners.cn_cleaner import clean_cn_content
+from shared.text.cleaners.cn_validator import (
+    validate_raw_text,
+    validate_cleaned_chapter,
+)
 class CrawlChapterExecutor(
     BaseTaskExecutor
 ):
@@ -148,24 +152,35 @@ class CrawlChapterExecutor(
 
 
         # =========================
-        # CLEAN & BUILD RAW TEXT
+        # CLEAN & VALIDATE TEXT
         # =========================
+
+        raw_text = (
+            f"{title}\n\n{content}"
+        ).strip()
+
+        if not raw_text:
+            raise ValueError(
+                "Chapter empty"
+            )
+
+        # Validate raw text (encoding / binary / replacement characters)
+        validate_raw_text(
+            raw_text
+        )
 
         cleaned_content = clean_cn_content(
             content
         )
 
-        raw_text = (
+        cleaned_text = (
             f"{title}\n\n{cleaned_content}"
         ).strip()
 
-
-        if not raw_text:
-
-            raise ValueError(
-                "Chapter empty"
-            )
-
+        # Validate cleaned text (Chinese character count & ratio)
+        validate_cleaned_chapter(
+            cleaned_text
+        )
 
         # =========================
         # SAVE TO CONTROL PLANE
@@ -176,17 +191,14 @@ class CrawlChapterExecutor(
             .api_client
         )
 
-
         await api.update_chapter_text(
-
             chapter_id=
             runtime_context.chapter_id,
-
             data={
-
                 "raw_text":
                 raw_text,
-
+                "cleaned_text":
+                cleaned_text,
                 "original_title":
                 title
             }
