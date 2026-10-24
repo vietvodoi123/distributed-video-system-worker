@@ -24,11 +24,11 @@ class WorkerSettings(BaseModel):
 class ApiSettings(BaseModel):
     base_url: str = "http://192.168.1.147:8000"
     translate_moxhi: str = "http://192.168.1.147:8090"
-    flaresolverr: str = "http://localhost:8191/v1"
+    flaresolverr: str = "http://192.168.1.147:8191/v1"
 
 
 class CrawlerSettings(BaseModel):
-    flaresolverr_url: str = "http://localhost:8191/v1"
+    flaresolverr_url: str = "http://192.168.1.147:8191/v1"
 
 
 class RunwareSettings(BaseModel):
@@ -109,6 +109,7 @@ class Settings(BaseModel):
     WORKER_TYPE: str = "gpu"
     WORKER_POLL_INTERVAL: int = 5
     TASK_LEASE_SECONDS: int = 30
+    FLARESOLVERR_URL: str = "http://192.168.1.147:8191/v1"
 
     @classmethod
     def load(cls, path: str | Path):
@@ -133,7 +134,7 @@ class Settings(BaseModel):
             "FLARESOLVERR_URL",
             data.get("crawler", {}).get(
                 "flaresolverr_url",
-                data.get("api", {}).get("flaresolverr", "http://localhost:8191/v1")
+                data.get("api", {}).get("flaresolverr", "http://192.168.1.147:8191/v1")
             )
         )
         storage_backend = os.getenv("STORAGE_BACKEND", "http")
@@ -156,6 +157,7 @@ class Settings(BaseModel):
         data["WORKER_TYPE"] = worker_type
         data["WORKER_POLL_INTERVAL"] = poll_interval
         data["TASK_LEASE_SECONDS"] = lease_seconds
+        data["FLARESOLVERR_URL"] = flaresolverr_url
 
         if "api" not in data:
             data["api"] = {}

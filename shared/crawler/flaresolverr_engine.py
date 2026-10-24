@@ -19,9 +19,10 @@ class FlareSolverrEngine(BaseCrawlerEngine):
         if not endpoint:
             endpoint = (
                 os.getenv("FLARESOLVERR_URL")
+                or getattr(settings, "FLARESOLVERR_URL", None)
                 or getattr(getattr(settings, "crawler", None), "flaresolverr_url", None)
                 or getattr(settings.api, "flaresolverr", None)
-                or "http://localhost:8191/v1"
+                or "http://192.168.1.147:8191/v1"
             )
 
         endpoint = str(endpoint).strip().rstrip("/")
