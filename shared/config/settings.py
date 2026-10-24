@@ -85,14 +85,14 @@ class Settings(BaseModel):
     minio: MinioSettings | None = None
     worker: WorkerSettings = WorkerSettings()
     api: ApiSettings = ApiSettings()
-    runware: RunwareSettings
-    llm: LLMSettings
-    youtube: YoutubeSettings
-    font: FontSetting
-    open_ai: OpenAiSetting
+    runware: RunwareSettings | None = None
+    llm: LLMSettings | None = None
+    youtube: YoutubeSettings | None = None
+    font: FontSetting | None = None
+    open_ai: OpenAiSetting | None = None
     capabilities: list[str] = []
-    translation: TranslationSetting
-    tts: ttsSetting
+    translation: TranslationSetting = TranslationSetting(chunk_max_chars=6000)
+    tts: ttsSetting = ttsSetting(tts_model="shared/data/model/ngochuyennew.onnx")
     video_render: VideoRenderSetting = VideoRenderSetting()
 
     # Worker deployment settings (aligned with master server & .env)
