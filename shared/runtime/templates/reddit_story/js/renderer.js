@@ -83,8 +83,46 @@ const NUM_WORKERS = (!isNaN(argWorkers) && argWorkers > 0) ? argWorkers : 2;
 const argQuality = parseInt(process.argv[5], 10);
 const JPEG_QUALITY = (!isNaN(argQuality) && argQuality > 0 && argQuality <= 100) ? argQuality : 70;
 
-const CHROME_PATH =
-  "C:/Program Files/Google/Chrome/Application/chrome.exe";
+function getChromePath() {
+  if (process.env.CHROME_PATH && fs.existsSync(process.env.CHROME_PATH)) {
+    return process.env.CHROME_PATH;
+  }
+  const candidatePaths = [
+    "C:/Program Files/Google/Chrome/Application/chrome.exe",
+    "C:/Program Files (x86)/Google/Chrome/Application/chrome.exe",
+    path.join(process.env.LOCALAPPDATA || "", "Google/Chrome/Application/chrome.exe"),
+    "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe",
+    "C:/Program Files/Microsoft/Edge/Application/msedge.exe",
+  ];
+
+  const playwrightDir = path.join(process.env.LOCALAPPDATA || "", "ms-playwright");
+  if (fs.existsSync(playwrightDir)) {
+    try {
+      const entries = fs.readdirSync(playwrightDir);
+      for (const entry of entries) {
+        const candidate = path.join(playwrightDir, entry, "chrome-win64", "chrome.exe");
+        if (fs.existsSync(candidate)) {
+          candidatePaths.push(candidate);
+        }
+      }
+    } catch (_) {}
+  }
+
+  for (const p of candidatePaths) {
+    if (p && fs.existsSync(p)) {
+      return p;
+    }
+  }
+
+  try {
+    return puppeteer.executablePath();
+  } catch (e) {
+    return "C:/Program Files/Google/Chrome/Application/chrome.exe";
+  }
+}
+
+const CHROME_PATH = getChromePath();
+console.log(`[Renderer] Using browser at: ${CHROME_PATH}`);
 
 // ========================================
 // PROGRESS

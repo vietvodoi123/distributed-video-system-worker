@@ -1,7 +1,7 @@
 import subprocess
 import os
 import math
-import shlex
+from pathlib import Path
 
 
 def create_scrolling_text_video(
@@ -14,7 +14,7 @@ def create_scrolling_text_video(
     font_color="white",
     bg_opacity=0.35,
     output_path="scrolling_text.mp4",
-    font_path=r"C:\Users\MAY1\PycharmProjects\distributed-video-system-worker\shared\runtime\fonts\Anton-Regular.ttf",
+    font_path: str | Path | None = None,
     use_gpu=False,
 ):
     """
@@ -24,6 +24,12 @@ def create_scrolling_text_video(
     - Không temp file
     - Ổn định cho video 10h+
     """
+    if font_path is None or "MAY1" in str(font_path):
+        default_font = Path(__file__).resolve().parents[2] / "fonts" / "Anton-Regular.ttf"
+        font_path = str(default_font)
+    else:
+        font_path = str(font_path)
+
     font_path = (
         font_path
         .replace("\\", "/")
@@ -85,20 +91,15 @@ def create_scrolling_text_video(
             "-maxrate", "4M",
             "-bufsize", "8M",
         ]
-        print("⚡ NVENC enabled (preset p4)")
     else:
         cmd += [
             "-c:v", "libx264",
             "-preset", "veryfast",   # production nên veryfast
             "-crf", "23",
         ]
-        print("🧠 CPU encode (veryfast)")
 
     cmd.append(output_path)
     cmd = [str(x) for x in cmd]
-
-    print("COMMAND:")
-    print(" ".join(cmd))
 
     process = subprocess.Popen(
         cmd,
@@ -108,18 +109,10 @@ def create_scrolling_text_video(
 
     stdout, stderr = process.communicate()
 
-    stdout = stdout.decode(
-        "utf-8",
-        errors="ignore"
-    )
-
     stderr = stderr.decode(
         "utf-8",
         errors="ignore"
     )
-
-    print("RETURN CODE =", process.returncode)
-    print(stderr)
 
     if process.returncode != 0:
         raise RuntimeError(

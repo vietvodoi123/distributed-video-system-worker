@@ -5,6 +5,7 @@ shared/data/tokens/
 .env
 
 # Bỏ qua tất cả file trong thư mục .venv (do virtualenv tạo ra)
+.venv/
 env/
 venv/
 tmp/
@@ -28,6 +29,7 @@ __pycache__/
 *.pyc
 *.pyo
 *.log
+*.exe
 .DS_Store
 
 **/credentials.json

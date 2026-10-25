@@ -194,3 +194,10 @@ class Settings(BaseModel):
 settings = Settings.load(
     Path(__file__).with_name("settings.yaml")
 )
+
+
+try:
+    from shared.utils.ffmpeg import setup_ffmpeg
+    setup_ffmpeg()
+except Exception as e:
+    pass
