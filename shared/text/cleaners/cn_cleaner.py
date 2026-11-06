@@ -161,10 +161,11 @@ def _remove_unicode_domains(
 # ============================================================
 
 AD_LINE_KEYWORDS = re.compile(
-    r"(?:天天看小說|天天看小说|讀小說|读小说|看小說|看小说|看書首選|看书首选|"
-    r"追書認準|追书认准|最新網址|最新网址|記住本站|记住本站|本站域名|"
-    r"瀏覽器訪問|浏览器访问|觀看最快|观看最快|緩存原因|缓存原因|"
-    r"超省心|超給力|超给力|超貼心|超贴心|體驗佳|体验佳|等你讀|等你读|超讚|超赞|等你看|無彈窗|无弹窗)"
+    r"(?:天天看小說|天天看小说|天天看書|天天看书|讀小說上|读小说上|讀小說|读小说|看小說|看小说|看書首選|看书首选|"
+    r"追書認準|追书认准|最新網址|最新网址|記住本站域名|记住本站域名|記住本站|记住本站|本站域名|"
+    r"望讀者記一下我們域名|望读者记一下我们域名|瀏覽器訪問|浏览器访问|觀看最快[的]?章節更新|观看最快[的]?章节更新|"
+    r"觀看最快|观看最快|緩存原因|缓存原因|超省心|超給力|超给力|超貼心|超贴心|體驗佳|体验佳|"
+    r"等你讀|等你读|超讚|超赞|等你看|無彈窗|无弹窗|書海量|书海量|任你挑|超便捷|最快更新|更新最快|網站|网站)"
 )
 
 CANDIDATE_DOMAIN_PATTERN = re.compile(
@@ -172,6 +173,8 @@ CANDIDATE_DOMAIN_PATTERN = re.compile(
     r"""[\.．․‧•·]"""
     r"""[^\s\u4e00-\u9fff\u3400-\u4dbf，。！？；：、（）()【】《》「」『』"'<>\[\]{}]+"""
 )
+
+CHINESE_CHAR_RE = re.compile(r"[\u4e00-\u9fff\u3400-\u4dbf]")
 
 
 def _normalize_confusables(candidate_str: str) -> str:
@@ -199,12 +202,63 @@ def _line_contains_domain(line: str) -> bool:
     return False
 
 
+PUNCT_SYMBOLS_RE = re.compile(
+    r"[\s\.,，。！？；：、（）()【】《》「」『』\"'<>[\]{}·•\-—~_]+"
+)
+
+
+def _is_pure_ad_or_domain_line(line: str) -> bool:
+    """
+    Kiểm tra xem một dòng có phải là dòng 100% rác / quảng cáo / tên miền hay không.
+    Tuyệt đối không xóa dòng nếu còn chứa nội dung truyện thực chất.
+    """
+    from shared.text.cleaners.cn_patterns import AD_PATTERNS
+    strip_l = line.strip()
+    if not strip_l:
+        return True
+
+    has_dom = _line_contains_domain(strip_l)
+    has_ad = bool(AD_LINE_KEYWORDS.search(strip_l))
+
+    # Khớp các mẫu dòng quảng cáo toàn dòng
+    if any(re.match(p, strip_l) for p in AD_PATTERNS):
+        return True
+
+    # Nếu dòng hoàn toàn không chứa tên miền và không chứa từ khóa quảng cáo -> Giữ lại 100%
+    if not (has_dom or has_ad):
+        return False
+
+    # Bóc tách URL và tên miền
+    cleaned = strip_l
+    for p in URL_PATTERNS:
+        cleaned = re.sub(p, "", cleaned)
+    cleaned = re.sub(DOMAIN_PATTERN, "", cleaned)
+
+    def repl_cand(m: re.Match) -> str:
+        cand = m.group(0)
+        norm = _normalize_confusables(cand)
+        if (
+            re.search(DOMAIN_PATTERN, norm, flags=re.IGNORECASE)
+            or re.search(r"\btt(?:k|ks|kan)\b", norm, flags=re.IGNORECASE)
+        ):
+            return ""
+        return cand
+
+    cleaned = CANDIDATE_DOMAIN_PATTERN.sub(repl_cand, cleaned)
+    cleaned = AD_LINE_KEYWORDS.sub("", cleaned)
+
+    for p in AD_PATTERNS:
+        cleaned = re.sub(p, "", cleaned)
+
+    # Bóc tách toàn bộ dấu câu, ký hiệu, khoảng trắng
+    remaining = PUNCT_SYMBOLS_RE.sub("", cleaned)
+    return len(remaining) == 0
+
+
 def _remove_ad_and_domain_lines(text: str) -> str:
     """
-    Xóa toàn bộ dòng nếu dòng đó là dòng watermark / quảng cáo:
-    - Dòng chứa tên miền + từ khóa quảng cáo (như '讀小說上天天看小說，𝒕𝒕𝒌.𝒕𝒘超省心')
-    - Dòng chứa tên miền và ngắn (<= 50 ký tự như '⑧вОΟｋ.Ｃоｍ')
-    - Dòng chứa cụm từ quảng cáo đứng riêng (<= 60 ký tự)
+    Xóa toàn bộ dòng CHỈ KHI dòng đó là dòng 100% rác / tên miền / watermark quảng cáo đứng riêng.
+    Không bao giờ xóa dòng chứa nội dung truyện hoặc câu thoại thông thường.
     """
     lines = []
     for line in text.splitlines():
@@ -212,9 +266,7 @@ def _remove_ad_and_domain_lines(text: str) -> str:
         if not strip_l:
             lines.append(line)
             continue
-        has_dom = _line_contains_domain(strip_l)
-        has_ad = bool(AD_LINE_KEYWORDS.search(strip_l))
-        if (has_dom and has_ad and len(strip_l) <= 100) or (has_dom and len(strip_l) <= 50) or (has_ad and len(strip_l) <= 60):
+        if _is_pure_ad_or_domain_line(strip_l):
             continue
         lines.append(line)
     return "\n".join(lines)
@@ -327,6 +379,18 @@ def _normalize_text(
     text = re.sub(
         r"[ ]+",
         " ",
+        text,
+    )
+
+    # Collapse duplicate commas or duplicate periods left by inline ad removal
+    text = re.sub(
+        r"[，,]{2,}",
+        "，",
+        text,
+    )
+    text = re.sub(
+        r"[。]{2,}",
+        "。",
         text,
     )
 

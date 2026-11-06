@@ -55,7 +55,7 @@ class ChinesePreprocessRegressionTest(unittest.TestCase):
             "⑧вОΟｋ.Ｃоｍ\n"
             "【記住本站域名 天天看小說體驗佳，𝘵𝘵𝘬.𝘵𝘸超讚 】\n"
             "看書首選天天看小說，𝓽𝓽𝓴.𝓽𝔀超給力\n"
-            "（由於緩存原因，請用戶直接瀏覽器訪問 天天看小說超貼心，𝙩𝘵𝙠.𝙩𝙬等你讀 網站，觀看最快的章節更新）\n"
+            "（由於緩存原因，請用戶直接瀏覽器訪問 天天看小說超貼心，𝙩𝘵𝙠.𝒕𝙬等你讀 網站，觀看最快的章節更新）\n"
             "⑧bοоК．ｃＯm\n"
             "⒏ｂoОК.CΟｍ\n"
             "他扶著墻走到街頭，發現今天街上特別熱鬧。"
@@ -104,6 +104,79 @@ class ChinesePreprocessRegressionTest(unittest.TestCase):
         self.assertIn("鄭玉龍本想請王野吃飯", cleaned)
         self.assertIn("爸，怎麼了？", cleaned)
         self.assertIn("好，我馬上回去。", cleaned)
+
+    def test_ttks_inline_ad_mixed_in_same_sentence_preserves_story_content(self):
+        """TTKS inline ads inserted directly into sentences must be removed without losing story text."""
+        raw_text = """兩人露出驚訝之色。讀小說上天天看小說，𝒕𝒕𝒌.𝒕𝒘超省心。中階力士繼續向前。
+
+轟！看書首選天天看小說，𝓽𝓽𝓴.𝓽𝔀超給力柳天雄身上恐怖的靈力涌動，逼迫的柳如煙，柳飛龍兩人，齊齊後退到了三米開外。
+
+柳天雄冷笑一聲。（由於緩存原因，請用戶直接瀏覽器訪問 天天看小說超貼心，𝙩𝘵𝙠.𝒕𝙬等你讀 網站，觀看最快的章節更新）隨後一掌凌空拍出。"""
+
+        cleaned = clean_cn_content(raw_text)
+
+        # Ads and domains must be stripped
+        self.assertNotIn("天天看小說", cleaned)
+        self.assertNotIn("ttk.tw", cleaned.lower())
+        self.assertNotIn("超省心", cleaned)
+        self.assertNotIn("超給力", cleaned)
+        self.assertNotIn("請用戶直接瀏覽器訪問", cleaned)
+
+        # 100% of the novel content before and after the ads must be preserved
+        self.assertIn("兩人露出驚訝之色", cleaned)
+        self.assertIn("中階力士繼續向前", cleaned)
+        self.assertIn("轟！", cleaned)
+        self.assertIn("柳天雄身上恐怖的靈力涌動", cleaned)
+        self.assertIn("齊齊後退到了三米開外", cleaned)
+        self.assertIn("柳天雄冷笑一聲", cleaned)
+        self.assertIn("隨後一掌凌空拍出", cleaned)
+
+    def test_preserves_common_chinese_dialogues_matching_ad_keywords(self):
+        """Short sentences with common words (看小说, 超给力, 等你看, 超赞) must NEVER be dropped."""
+        dialogues = [
+            "他平時也喜歡看小說。",
+            "“你在讀小說嗎？”“沒有，我在看書。”",
+            "“這件法寶超給力！”",
+            "“師尊在等你看好戲。”",
+            "“那個主意超讚！”",
+            "“小師妹真超貼心。”",
+        ]
+        raw_text = "\n\n".join(dialogues)
+
+        cleaned = clean_cn_content(raw_text)
+
+        for d in dialogues:
+            self.assertIn(d, cleaned)
+
+    def test_ttks_standalone_and_unicode_styled_variants(self):
+        """TTKS standalone lines with various styles (bold script, sans-serif, ttks.tw) are cleanly stripped."""
+        raw_text = """第一章 宗門大會
+
+看書首選天天看小說，ttks.tw超給力
+
+望讀者記一下我們域名 天天看小說，ttks.tw超便捷
+
+【記住本站域名 天天看小說體驗佳，𝘵𝘵𝘬.𝘵𝘸超讚 】
+
+長老們肅然而立，大殿內一片寂靜。
+
+天天看小說體驗佳，𝘵𝘵𝘬.𝘵𝘸超讚
+
+天天看小說，ttk.tw
+
+掌門真人緩緩開口：“今日召集諸位，乃是為了秘境開啟之事。”"""
+
+        cleaned = clean_cn_content(raw_text)
+
+        self.assertNotIn("天天看小說", cleaned)
+        self.assertNotIn("ttks.tw", cleaned.lower())
+        self.assertNotIn("ttk.tw", cleaned.lower())
+        self.assertNotIn("超便捷", cleaned)
+        self.assertNotIn("超讚", cleaned)
+
+        self.assertIn("第一章 宗門大會", cleaned)
+        self.assertIn("長老們肅然而立，大殿內一片寂靜", cleaned)
+        self.assertIn("掌門真人緩緩開口：“今日召集諸位，乃是為了秘境開啟之事。”", cleaned)
 
 
 if __name__ == "__main__":
