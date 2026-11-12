@@ -134,6 +134,15 @@ class WorkerApiClient:
             f"/chapters/{chapter_id}/text"
         )
 
+    async def get_chapter_source_text(
+        self,
+        chapter_source_id: str
+    ):
+
+        return await self._get(
+            f"/chapter-sources/{chapter_source_id}/text"
+        )
+
     async def update_chapter_text(
         self,
         *,
@@ -182,18 +191,16 @@ class WorkerApiClient:
         worker_id: str,
         task_id: str,
         execution_result: dict,
+        attempt_id: str | None = None,
     ):
 
         payload = {
-            "worker_id":
-            worker_id,
-
-            "task_id":
-            str(task_id),
-
-            "result":
-            execution_result
+            "worker_id": worker_id,
+            "task_id": str(task_id),
+            "result": execution_result,
         }
+        if attempt_id is not None:
+            payload["attempt_id"] = str(attempt_id)
 
         return await self._post(
             "/workers/complete-task",
@@ -209,19 +216,17 @@ class WorkerApiClient:
         *,
         worker_id: str,
         task_id: str,
-        error_message: str
+        error_message: str,
+        attempt_id: str | None = None,
     ):
 
         payload = {
-            "worker_id":
-            worker_id,
-
-            "task_id":
-            str(task_id),
-
-            "error_message":
-            error_message
+            "worker_id": worker_id,
+            "task_id": str(task_id),
+            "error_message": error_message,
         }
+        if attempt_id is not None:
+            payload["attempt_id"] = str(attempt_id)
 
         return await self._post(
             "/workers/fail-task",

@@ -43,14 +43,18 @@ class MoxhiTranslateService:
 
         result = response.json()
 
-        if not result.get("ok"):
-
+        if result.get("ok") is False:
             raise ValueError(
                 f"Moxhi translation failed: {result}"
             )
 
-        return (
-            result
-            .get("text", "")
-            .strip()
-        )
+        translated = result.get("translated_text")
+        if translated is None:
+            translated = result.get("text")
+
+        if translated is None:
+            raise ValueError(
+                f"Moxhi translation returned unexpected payload: {result}"
+            )
+
+        return str(translated).strip()

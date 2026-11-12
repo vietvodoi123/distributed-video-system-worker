@@ -24,16 +24,17 @@ class MergeBatchVideosExecutor(
     ]
 
     @staticmethod
-    def _get_chapter_number(video_path: str) -> int:
+    def _get_chapter_number(video_path: str) -> int | float:
         """
         Extract the chapter number from paths such as:
 
         batches/<batch_id>/chapters/551/video/final/final.mp4
+        batches/<batch_id>/chapters/150.01/video/final/final.mp4
         """
         normalized = str(video_path).replace("\\", "/")
 
         match = re.search(
-            r"/chapters/(\d+)(?:/|$)",
+            r"/chapters/(\d+(?:\.\d+)?)(?:/|$)",
             normalized,
             re.IGNORECASE,
         )
@@ -44,7 +45,11 @@ class MergeBatchVideosExecutor(
                 f"{video_path}"
             )
 
-        return int(match.group(1))
+        raw = match.group(1)
+        if "." in raw:
+            val = float(raw)
+            return int(val) if val.is_integer() else val
+        return int(raw)
 
     @classmethod
     def _sort_video_paths(cls, video_paths):

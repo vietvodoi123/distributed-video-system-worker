@@ -51,34 +51,51 @@ class AudioExecutor(
             .artifact_storage
         )
 
+        payload = getattr(task, "payload", {}) or {}
+
         chapter_id = (
-            task.chapter_id
+            getattr(runtime_context, "chapter_id", None)
+            or getattr(task, "chapter_id", None)
+            or payload.get("chapter_id")
         )
+        chapter_source_id = (
+            getattr(runtime_context, "chapter_source_id", None)
+            or getattr(task, "chapter_source_id", None)
+            or payload.get("chapter_source_id")
+        )
+        chapter_ref = chapter_source_id or chapter_id or getattr(task, "id", "unknown")
 
         # =====================================
         # GET TRANSLATED TEXT
         # =====================================
 
-        chapter_data = await api.get_chapter_text(
-            chapter_id
-        )
-
-        if not chapter_data:
-            raise RuntimeError(
-                f"Cannot load chapter text: "
-                f"chapter={chapter_id}"
-            )
-
         translate_text = (
-            chapter_data.get(
-                "translated_text"
-            )
+            payload.get("final_script")
+            or payload.get("translated_text")
         )
+
+        if not translate_text:
+            chapter_data = None
+            if chapter_id:
+                chapter_data = await api.get_chapter_text(chapter_id)
+            elif chapter_source_id and hasattr(api, "get_chapter_source_text"):
+                chapter_data = await api.get_chapter_source_text(chapter_source_id)
+
+            if not chapter_data:
+                raise RuntimeError(
+                    f"Cannot load chapter text: "
+                    f"chapter={chapter_ref}"
+                )
+
+            translate_text = (
+                chapter_data.get("final_script")
+                or chapter_data.get("translated_text")
+            )
 
         if not translate_text:
             raise RuntimeError(
                 f"Chapter has no translated_text: "
-                f"chapter={chapter_id}"
+                f"chapter={chapter_ref}"
             )
 
         # =====================================
@@ -98,12 +115,12 @@ class AudioExecutor(
         if not lines:
             raise RuntimeError(
                 f"Translated text contains no "
-                f"usable lines: chapter={chapter_id}"
+                f"usable lines: chapter={chapter_ref}"
             )
 
         print(
             "[AudioExecutor] "
-            f"Chapter={chapter_id} "
+            f"Chapter={chapter_ref} "
             f"Lines={len(lines)}"
         )
 

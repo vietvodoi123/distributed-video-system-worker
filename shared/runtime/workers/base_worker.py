@@ -1,4 +1,5 @@
 import asyncio
+import time
 import uuid
 import traceback
 from abc import ABC
@@ -259,11 +260,6 @@ class BaseWorker(ABC):
 
             return
 
-        print(
-            "[BaseWorker]",
-            f"Claimed {len(tasks)} tasks",
-        )
-
         for task_data in tasks:
             future = asyncio.create_task(
                 self.execute_with_limits(task_data)
@@ -276,9 +272,8 @@ class BaseWorker(ABC):
             )
 
         print(
-            "[BaseWorker]",
-            f"InFlight={len(self.inflight_tasks)} "
-            f"Available={self.available_slots()}"
+            f"[BaseWorker] Claimed {len(tasks)} task(s) "
+            f"(InFlight={len(self.inflight_tasks)}, Available={self.available_slots()})"
         )
 
     # ======================================
@@ -321,16 +316,32 @@ class BaseWorker(ABC):
     # EXECUTE RESERVED TASK
     # ======================================
 
+    @staticmethod
+    def _format_task_tag(task: TaskDto | None) -> str:
+        if not task:
+            return "[unknown]"
+        short_id = str(task.id)[:8]
+        payload = task.payload or {}
+        chap = task.chapter_number if task.chapter_number is not None else payload.get("chapter_number")
+        if isinstance(chap, float) and chap.is_integer():
+            chap = int(chap)
+        if chap is not None:
+            return f"[{task.task_type} ch.{chap} {short_id}]"
+        return f"[{task.task_type} {short_id}]"
+
     async def execute_reserved_task(
         self,
         task_data: dict
     ):
+
+        started_at = time.perf_counter()
 
         workspace_dir = None
 
         task = None
 
         runtime_context = None
+        tag = "[unknown]"
         try:
 
             # ==================================
@@ -340,20 +351,11 @@ class BaseWorker(ABC):
                 raise ValueError("Missing task payload")
 
             task = TaskDto.from_dict(task_data)
+            tag = self._format_task_tag(task)
             async with self.running_tasks_lock:
                 self.running_tasks.add(str(task.id))
 
-            print(
-                "[BaseWorker] "
-                f"Claimed task: "
-                f"{task.id}"
-            )
-
-            print(
-                "[BaseWorker] "
-                f"Task type: "
-                f"{task.task_type}"
-            )
+            print(f"[BaseWorker] START {tag}")
 
             # ==================================
             # EXECUTOR
@@ -416,21 +418,14 @@ class BaseWorker(ABC):
             # ==================================
 
             await self.api.complete_task(
-                worker_id=
-                self.worker_id,
-
-                task_id=
-                str(task.id),
-
-                execution_result=
-                execution_result
+                worker_id=self.worker_id,
+                task_id=str(task.id),
+                attempt_id=task.attempt_id,
+                execution_result=execution_result,
             )
 
-            print(
-                "[BaseWorker] "
-                f"Task completed: "
-                f"{task.id}"
-            )
+            elapsed = time.perf_counter() - started_at
+            print(f"[BaseWorker] DONE  {tag} ({elapsed:.1f}s)")
 
         # ======================================
         # FAILED
@@ -438,24 +433,17 @@ class BaseWorker(ABC):
 
         except Exception as e:
 
-            print(
-                "[BaseWorker] "
-                f"Task failed: "
-                f"{task.id if task else 'unknown'}"
-            )
+            elapsed = time.perf_counter() - started_at
+            print(f"[BaseWorker] FAIL  {tag} ({elapsed:.1f}s): {e}")
 
             traceback.print_exc()
 
             if task:
                 await self.api.fail_task(
-                    worker_id=
-                    self.worker_id,
-
-                    task_id=
-                    str(task.id),
-
-                    error_message=
-                    str(e)
+                    worker_id=self.worker_id,
+                    task_id=str(task.id),
+                    attempt_id=task.attempt_id,
+                    error_message=str(e),
                 )
 
         # ======================================

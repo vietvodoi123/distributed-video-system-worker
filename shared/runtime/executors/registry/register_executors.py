@@ -1,6 +1,5 @@
 from shared.runtime.executors.registry.task_executor_registry import TaskExecutorRegistry
-from shared.runtime.executors.crawl.crawl_chapter_executor import CrawlChapterExecutor
-from shared.runtime.executors.translation.translate_text_excutor import TranslateTextExecutor
+from shared.runtime.executors.text.text_executor import TextExecutor
 from shared.runtime.executors.audio.audio_executor import AudioExecutor
 from shared.runtime.executors.audio.service.tts_service import TTSService
 from shared.runtime.executors.video.generate_video_executor import GenerateVideoExecutor
@@ -17,9 +16,8 @@ def register_executors(gpu_available, model_path, config_path):
         max_concurrency=max_concurrency,
     )
 
-    # Đăng ký 5 Executor cốt lõi khớp với Server
-    TaskExecutorRegistry.register(CRAWL_CHAPTER, CrawlChapterExecutor())
-    TaskExecutorRegistry.register(TRANSLATE_TEXT, TranslateTextExecutor())
+    # Đăng ký 4 Executor cốt lõi khớp với Server
+    TaskExecutorRegistry.register(TEXT, TextExecutor())
     TaskExecutorRegistry.register(AUDIO, AudioExecutor(tts_service=tts_service))
     TaskExecutorRegistry.register(VIDEO, GenerateVideoExecutor())
     TaskExecutorRegistry.register(MERGE_BATCH_VIDEO, MergeBatchVideosExecutor())

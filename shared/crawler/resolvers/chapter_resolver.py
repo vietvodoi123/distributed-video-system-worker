@@ -252,7 +252,6 @@ class ChapterResolver:
             # ==============================
 
             next_link = soup.select_one(css_next)
-            print(next_link)
             if not next_link:
                 break
 

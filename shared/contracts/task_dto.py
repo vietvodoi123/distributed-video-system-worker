@@ -162,11 +162,17 @@ class TaskDto:
 
     task_group: str | None = None
 
+    attempt_id: str | None = None
+
+    story_id: str | None = None
+
     batch_id: str | None = None
 
     chapter_id: str | None = None
 
-    chapter_number: int | None = None
+    chapter_source_id: str | None = None
+
+    chapter_number: int | float | None = None
 
     payload: dict = field(default_factory=dict)
 
@@ -182,9 +188,15 @@ class TaskDto:
 
             task_group=data.get("task_group"),
 
+            attempt_id=data.get("attempt_id"),
+
+            story_id=data.get("story_id"),
+
             batch_id=data.get("batch_id"),
 
             chapter_id=data.get("chapter_id"),
+
+            chapter_source_id=data.get("chapter_source_id") or (data.get("payload") or {}).get("chapter_source_id"),
 
             chapter_number=data.get("chapter_number"),
 

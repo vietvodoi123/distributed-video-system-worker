@@ -1,11 +1,10 @@
 # quick_test_cleaner.py
-# File test nhanh 2 lớp lọc: Lớp 1 (Tiếng Trung / Crawl) và Lớp 2 (Tiếng Việt / Translate)
+# File test nhanh làm sạch văn bản crawl với module SpamCleaner
 
 import sys
-from shared.text.cleaners.cn_cleaner import clean_cn_content
-from shared.runtime.executors.translation.translate_text_excutor import (
-    filter_corrupted_translation_lines,
-)
+from spam_cleaner import SpamCleaner
+
+_cleaner = SpamCleaner()
 
 SAMPLE_CN_TEXT = """“叮鈴鈴……”鄭玉龍本想請王野吃飯，結果話還沒說完，手機就響了起來。
 “爸，怎麼了？”
@@ -39,13 +38,22 @@ Một tấm biểu ngữ đơn giản thô bạo: "Tiên môn nạp mới, đo l
 
 def test_layer_1_cn(text: str):
     print("=" * 60)
-    print(" [LỚP 1] TEST TIẾNG TRUNG (CRAWL / PREPROCESS)")
+    print(" [SPAM CLEANER] TEST TIẾNG TRUNG (CRAWL / PREPROCESS)")
     print("=" * 60)
     print("--- [TRƯỚC KHI LỌC] ---")
     print(text)
     print("\n--- [SAU KHI LỌC] ---")
-    cleaned = clean_cn_content(text)
+    res = _cleaner.clean(text)
+    cleaned = res["cleaned_text"]
     print(cleaned)
+    if res["removed_lines"]:
+        print("\n--- [CÁC DÒNG RÁC ĐÃ XÓA] ---")
+        for r in res["removed_lines"]:
+            print(f"  [p={r['prob']:.2f}] {r['text']}")
+    if res["stripped_tails"]:
+        print("\n--- [CÁC ĐUÔI WATERMARK ĐÃ CẮT] ---")
+        for t in res["stripped_tails"]:
+            print(f"  [p={t['prob']:.2f}] '{t['before']}' -> '{t['after']}'")
     print("=" * 60)
     return cleaned
 

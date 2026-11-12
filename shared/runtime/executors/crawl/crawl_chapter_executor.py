@@ -16,7 +16,7 @@ from shared.runtime.contexts.chapter_runtime_context import (
 )
 
 from shared.crawler.engine_factory import EngineFactory
-from shared.text.cleaners.cn_cleaner import clean_cn_content
+from spam_cleaner import SpamCleaner
 from shared.text.cleaners.cn_validator import (
     validate_raw_text,
     validate_cleaned_chapter,
@@ -24,6 +24,8 @@ from shared.text.cleaners.cn_validator import (
 class CrawlChapterExecutor(
     BaseTaskExecutor
 ):
+    def __init__(self, spam_cleaner: SpamCleaner | None = None):
+        self.cleaner = spam_cleaner or SpamCleaner()
 
     async def execute(
         self,
@@ -169,7 +171,7 @@ class CrawlChapterExecutor(
             raw_text
         )
 
-        cleaned_content = clean_cn_content(
+        cleaned_content = self.cleaner.clean_text(
             content
         )
 

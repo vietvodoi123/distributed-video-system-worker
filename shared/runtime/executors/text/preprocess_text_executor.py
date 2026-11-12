@@ -2,9 +2,7 @@ from shared.runtime.executors.base.base_task_executor import (
     BaseTaskExecutor
 )
 
-from shared.text.cleaners.cn_cleaner import (
-    clean_cn_content
-)
+from spam_cleaner import SpamCleaner
 
 from shared.text.cleaners.cn_validator import (
     validate_raw_text, validate_cleaned_chapter
@@ -20,6 +18,9 @@ class PreprocessTextExecutor(
 ):
 
     task_type = "preprocess_text"
+
+    def __init__(self, spam_cleaner: SpamCleaner | None = None):
+        self.cleaner = spam_cleaner or SpamCleaner()
 
 
     async def execute(
@@ -66,7 +67,7 @@ class PreprocessTextExecutor(
         # CLEAN
         # =====================================
 
-        cleaned_text = clean_cn_content(
+        cleaned_text = self.cleaner.clean_text(
             raw_text
         )
 

@@ -4,6 +4,8 @@ REFINE_TEXT='REFINE_TEXT'
 GENERATE_TTS_SEGMENTS="GENERATE_TTS_SEGMENTS"
 MERGE_TTS_SEGMENTS = "merge_tts_segments"
 
+TEXT = "text"
+
 CRAWL_CHAPTER = "crawl_chapter"
 
 PREPROCESS_TEXT="preprocess_text"
