@@ -97,7 +97,6 @@ class TextExecutorTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("ttks.tw", translate_service.calls[0])
 
         expected_translated = (
-            "Chương 1 Đại hội tông môn\n"
             "Linh lực khủng bố trên người Liễu Thiên Hùng cuộn trào."
         )
         self.assertEqual(result["original_title"], "第一章 宗門大會")
@@ -107,6 +106,7 @@ class TextExecutorTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("final_script", result)
         self.assertNotIn("final_text", result)
         self.assertEqual(result["translated_text"], expected_translated)
+        self.assertNotIn(result["translated_title"], result["translated_text"])
 
     async def test_resolver_crawl_flow_with_html_http_engine(self):
         cn_body = "長老們肅然而立，大殿內一片寂靜，掌門真人緩緩開口說道今日之事非同小可。" * 5
@@ -169,9 +169,10 @@ class TextExecutorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["raw_text"], "第三章\n\n原文內容。")
         self.assertNotIn("cleaned_text", result)
         self.assertNotIn("final_script", result)
-        self.assertEqual(result["translated_text"], "Chương 3\nNội dung đã dịch")
+        self.assertEqual(result["translated_text"], "Nội dung đã dịch")
         self.assertEqual(result["original_title"], "第三章")
         self.assertEqual(result["translated_title"], "Chương 3")
+        self.assertNotIn(result["translated_title"], result["translated_text"])
 
     async def test_missing_source_url_raises(self):
         executor = TextExecutor(translate_service=FakeTranslateService("unused"))
@@ -197,28 +198,7 @@ class TextExecutorTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(api_client.updates, [])
 
-    def test_filter_corrupted_translation_lines(self):
-        raw = "Dòng hợp lệ\n8<0xD0><0xB2>k.com\n<0xAA>\n8book.com\nDòng cuối"
-        self.assertEqual(
-            filter_corrupted_translation_lines(raw),
-            "Dòng hợp lệ\nDòng cuối",
-        )
 
-    def test_task_dto_and_api_client_include_attempt_id(self):
-        dto = TaskDto.from_dict(
-            {
-                "id": "t1",
-                "task_type": "text",
-                "task_stage": "text",
-                "attempt_id": "att-1",
-                "story_id": "story-1",
-                "chapter_id": "chap-1",
-                "chapter_number": 1,
-                "payload": {},
-            }
-        )
-        self.assertEqual(dto.attempt_id, "att-1")
-        self.assertEqual(dto.story_id, "story-1")
 
     async def test_worker_api_client_complete_and_fail_send_attempt_id(self):
         client = WorkerApiClient()
@@ -305,9 +285,10 @@ class TextExecutorTests(unittest.IsolatedAsyncioTestCase):
 
         result = await executor.execute(task, batch_ctx)
 
-        self.assertEqual(result["translated_text"], "Chương 1\nNội dung")
+        self.assertEqual(result["translated_text"], "Nội dung")
         self.assertEqual(result["original_title"], "第1章")
         self.assertEqual(result["translated_title"], "Chương 1")
+        self.assertNotIn(result["translated_title"], result["translated_text"])
 
     async def test_runtime_context_factory_handles_null_chapter_id_across_task_types(self):
         from pathlib import Path

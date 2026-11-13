@@ -25,32 +25,19 @@ _DOMAIN_LINE_PATTERN = re.compile(
 
 
 def filter_corrupted_translation_lines(text: str) -> str:
-    """
-    Loại bỏ các dòng chứa mã byte rác hoặc domain bị lỗi dịch:
-    - Bắt dấu hiệu '><' (hai thẻ dấu ngoặc nhọn đấu đầu nhau như <0xD0><0xB2>)
-    - Bắt mã byte hex <0x..>
-    - Bắt dòng chỉ chứa domain còn sót lại
-    """
+    """Loại bỏ các dòng chứa mã byte rác hoặc domain bị lỗi dịch."""
     if not text:
         return ""
 
     clean_lines = []
-
     for line in text.splitlines():
         line_stripped = line.strip()
-
-        # 1. Bắt signature '><' (hai thẻ byte đụng đầu nhau)
-        if "><" in line_stripped:
+        if (
+            "><" in line_stripped
+            or _HEX_BYTE_PATTERN.search(line_stripped)
+            or _DOMAIN_LINE_PATTERN.match(line_stripped)
+        ):
             continue
-
-        # 2. Bắt mã byte hex lẻ <0x..>
-        if _HEX_BYTE_PATTERN.search(line_stripped):
-            continue
-
-        # 3. Bắt dòng chỉ là domain rác sót lại
-        if _DOMAIN_LINE_PATTERN.match(line_stripped):
-            continue
-
         clean_lines.append(line)
 
     return "\n".join(clean_lines).strip()
@@ -64,8 +51,35 @@ def _first_non_empty_line(text: str) -> str:
     return ""
 
 
+def _join_title_content(title: str, content: str) -> str:
+    return f"{title}\n\n{content}".strip() if title else content.strip()
+
+
+def _strip_translated_title(translated_text: str, translated_title: str) -> str:
+    """Loại bỏ translated_title khỏi đầu translated_text nếu có."""
+    if not translated_text or not translated_title:
+        return translated_text
+
+    text = translated_text.strip()
+    title = translated_title.strip()
+
+    if text.startswith(title):
+        return text[len(title):].lstrip("\r\n \t")
+
+    lines = text.splitlines()
+    for i, line in enumerate(lines):
+        line_clean = line.strip()
+        if not line_clean:
+            continue
+        if line_clean == title:
+            return "\n".join(lines[i + 1:]).strip()
+        break
+
+    return text
+
+
 class TextExecutor(BaseTaskExecutor):
-    """Executor xử lý task 'text': crawl (nếu cần), clean/validate bằng SpamCleaner, dịch và trả kết quả."""
+    """Executor xử lý task 'text': crawl (nếu cần), clean spam, dịch và trả kết quả."""
 
     task_type = TEXT
 
@@ -157,14 +171,14 @@ class TextExecutor(BaseTaskExecutor):
         crawled_title, content = await self._crawl_chapter(payload)
         title = crawled_title or payload_title
 
-        raw_text = f"{title}\n\n{content}".strip() if title else content.strip()
+        raw_text = _join_title_content(title, content)
         if not raw_text:
             raise ValueError("Chapter empty")
 
         validate_raw_text(raw_text)
 
         cleaned_content = self.cleaner.clean_text(content)
-        cleaned_text = f"{title}\n\n{cleaned_content}".strip() if title else cleaned_content.strip()
+        cleaned_text = _join_title_content(title, cleaned_content)
 
         validate_cleaned_chapter(cleaned_text)
         return title, raw_text, cleaned_text
@@ -175,33 +189,17 @@ class TextExecutor(BaseTaskExecutor):
         runtime_context: BaseRuntimeContext,
     ):
         payload = task.payload or {}
-        chapter_id = (
-            getattr(runtime_context, "chapter_id", None)
-            or getattr(task, "chapter_id", None)
-            or payload.get("chapter_id")
-        )
-        chapter_source_id = (
-            getattr(runtime_context, "chapter_source_id", None)
-            or getattr(task, "chapter_source_id", None)
-            or payload.get("chapter_source_id")
-        )
-        chapter_number = (
-            getattr(runtime_context, "chapter_number", None)
-            or getattr(task, "chapter_number", None)
-            or payload.get("chapter_number")
-        )
 
-        # =========================
-        # 1. CRAWL / PREPARE TEXT
-        # =========================
+        # 1. Thu thập và làm sạch văn bản gốc
         original_title, raw_text, text_to_translate = await self._prepare_source_text(payload)
 
-        # =========================
-        # 2. TRANSLATE TEXT
-        # =========================
+        # 2. Dịch văn bản sang tiếng Việt
         translate_service = self.translate_service or MoxhiTranslateService()
-        chapter_translated = await translate_service.translate(text_to_translate)
+        translated_raw = await translate_service.translate(text_to_translate)
+        if not translated_raw:
+            raise ValueError("Translated text is empty")
 
+        chapter_translated = filter_corrupted_translation_lines(translated_raw)
         if not chapter_translated:
             raise ValueError("Translated text is empty")
 
@@ -210,22 +208,36 @@ class TextExecutor(BaseTaskExecutor):
             translated_title_raw = await translate_service.translate(original_title)
             translated_title = translated_title_raw.strip() or translated_title
 
-        if isinstance(chapter_number, float) and chapter_number.is_integer():
-            chapter_number = int(chapter_number)
+        # Loại bỏ translated_title khỏi translated_text (chỉ giữ lại phần nội dung)
+        translated_text = _strip_translated_title(chapter_translated, translated_title)
+
+        # 3. Log thông tin thực thi gọn gàng
+        chapter_num = (
+            getattr(runtime_context, "chapter_number", None)
+            or getattr(task, "chapter_number", None)
+            or payload.get("chapter_number")
+        )
+        if isinstance(chapter_num, float) and chapter_num.is_integer():
+            chapter_num = int(chapter_num)
 
         chap_label = (
-            f"ch.{chapter_number}"
-            if chapter_number is not None
-            else str(chapter_source_id or chapter_id or getattr(task, "id", "unknown"))[:8]
+            f"ch.{chapter_num}"
+            if chapter_num is not None
+            else str(
+                getattr(runtime_context, "chapter_source_id", None)
+                or getattr(runtime_context, "chapter_id", None)
+                or getattr(task, "chapter_id", None)
+                or getattr(task, "id", "unknown")
+            )[:8]
         )
-        short_task_id = str(getattr(task, "id", ""))[:8]
+        task_id = str(getattr(task, "id", ""))[:8]
         print(
-            f"[TextExecutor] [{chap_label} {short_task_id}] "
-            f"raw={len(raw_text)} -> vi={len(chapter_translated)} ({translated_title})"
+            f"[TextExecutor] [{chap_label} {task_id}] "
+            f"raw={len(raw_text)} -> vi={len(translated_text)} ({translated_title})"
         )
 
         return {
-            "translated_text": chapter_translated,
+            "translated_text": translated_text,
             "original_title": original_title,
             "translated_title": translated_title,
             "raw_text": raw_text,

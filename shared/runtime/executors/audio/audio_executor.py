@@ -1,30 +1,17 @@
-import time
-from pathlib import Path
 import asyncio
-from shared.runtime.executors.base.base_task_executor import (
-    BaseTaskExecutor,
-)
+from pathlib import Path
+import time
 
-from shared.runtime.executors.audio.service.tts_service import (
-    TTSService,
-)
-
-from shared.runtime.executors.audio.service.models import (
-    TTSOptions,
-)
-
-from shared.runtime.executors.audio.utils.audio_concat import (
-    concat_wav_files,
-)
-
-from shared.runtime.contexts.chapter_runtime_context import (
-    ChapterRuntimeContext,
-)
+from shared.config.settings import settings
+from shared.runtime.contexts.chapter_runtime_context import ChapterRuntimeContext
+from shared.runtime.executors.audio.service.models import TTSOptions
+from shared.runtime.executors.audio.service.tts_service import TTSService
+from shared.runtime.executors.audio.utils.audio_concat import concat_wav_files
+from shared.runtime.executors.base.base_task_executor import BaseTaskExecutor
 
 
-class AudioExecutor(
-    BaseTaskExecutor,
-):
+class AudioExecutor(BaseTaskExecutor):
+    """Executor xử lý task 'audio': tổng hợp giọng đọc TTS và ghép thành file narration WAV."""
 
     def __init__(
         self,
@@ -38,19 +25,9 @@ class AudioExecutor(
         task,
         runtime_context: ChapterRuntimeContext,
     ):
-
         started_at = time.time()
-
-        api = (
-            runtime_context
-            .api_client
-        )
-
-        storage = (
-            runtime_context
-            .artifact_storage
-        )
-
+        api = runtime_context.api_client
+        storage = runtime_context.artifact_storage
         payload = getattr(task, "payload", {}) or {}
 
         chapter_id = (
@@ -66,13 +43,10 @@ class AudioExecutor(
         chapter_ref = chapter_source_id or chapter_id or getattr(task, "id", "unknown")
 
         # =====================================
-        # GET TRANSLATED TEXT
+        # 1. LẤY VĂN BẢN VÀ TIÊU ĐỀ ĐÃ DỊCH
         # =====================================
-
-        translate_text = (
-            payload.get("final_script")
-            or payload.get("translated_text")
-        )
+        translate_text = payload.get("final_script") or payload.get("translated_text")
+        translate_title = payload.get("translate_title") or payload.get("translated_title")
 
         if not translate_text:
             chapter_data = None
@@ -83,55 +57,49 @@ class AudioExecutor(
 
             if not chapter_data:
                 raise RuntimeError(
-                    f"Cannot load chapter text: "
-                    f"chapter={chapter_ref}"
+                    f"Cannot load chapter text: chapter={chapter_ref}"
                 )
 
             translate_text = (
                 chapter_data.get("final_script")
                 or chapter_data.get("translated_text")
             )
+            if not translate_title:
+                translate_title = (
+                    chapter_data.get("translate_title")
+                    or chapter_data.get("translated_title")
+                )
 
         if not translate_text:
             raise RuntimeError(
-                f"Chapter has no translated_text: "
-                f"chapter={chapter_ref}"
+                f"Chapter has no translated_text: chapter={chapter_ref}"
             )
 
         # =====================================
-        # SPLIT LINES
+        # 2. TÁCH DÒNG VÀ CHÈN TIÊU ĐỀ VÀO ĐẦU
         # =====================================
+        raw_lines = translate_text.split("\n")
+        lines = [line.strip() for line in raw_lines if line.strip()]
 
-        raw_lines = (
-            translate_text.split("\n")
-        )
-
-        lines = [
-            line.strip()
-            for line in raw_lines
-            if line.strip()
-        ]
+        if translate_title and translate_title.strip():
+            title_line = translate_title.strip()
+            if not lines or lines[0] != title_line:
+                lines.insert(0, title_line)
 
         if not lines:
             raise RuntimeError(
-                f"Translated text contains no "
-                f"usable lines: chapter={chapter_ref}"
+                f"Translated text contains no usable lines: chapter={chapter_ref}"
             )
 
+        title_info = f" (title: '{translate_title}')" if translate_title else ""
         print(
-            "[AudioExecutor] "
-            f"Chapter={chapter_ref} "
-            f"Lines={len(lines)}"
+            f"[AudioExecutor] Chapter={chapter_ref} Lines={len(lines)}{title_info}"
         )
 
         # =====================================
-        # TTS OPTIONS
+        # 3. CẤU HÌNH TTS OPTIONS
         # =====================================
-
-        from shared.config.settings import settings
-        payload = getattr(task, "payload", {}) or {}
         speed = payload.get("speed", getattr(settings.tts, "default_speed", 1.0))
-
         options = TTSOptions(
             speed=speed,
             volume=1.0,
@@ -139,16 +107,12 @@ class AudioExecutor(
         )
 
         # =====================================
-        # GENERATE TTS (SHARED WORKER-LEVEL SEMAPHORE)
+        # 4. TỔNG HỢP TTS TỪNG DÒNG (SHARED SEMAPHORE)
         # =====================================
-
-        async def synthesize_line(
-                line_index: int,
-                line_text: str,
-        ):
+        async def synthesize_line(line_index: int, line_text: str):
             output_file = (
-                    Path(runtime_context.workspace_dir)
-                    / f"tts_line_{line_index:04d}.wav"
+                Path(runtime_context.workspace_dir)
+                / f"tts_line_{line_index:04d}.wav"
             )
 
             result = await self.tts_service.synthesize_text_async(
@@ -166,34 +130,19 @@ class AudioExecutor(
 
         results = await asyncio.gather(
             *(
-                synthesize_line(
-                    line_index,
-                    line_text,
-                )
+                synthesize_line(line_index, line_text)
                 for line_index, line_text in enumerate(lines)
             )
         )
-
         segments = list(results)
-
-        segment_files = [
-            Path(segment["output_path"])
-            for segment in segments
-        ]
+        segment_files = [Path(segment["output_path"]) for segment in segments]
 
         # =====================================
-        # OUTPUT
+        # 5. GHÉP CÁC FILE WAV THÀNH MERGED.WAV
         # =====================================
-
         merged_local_path = str(
-            Path(
-                runtime_context.workspace_dir
-            ) / "merged.wav"
+            Path(runtime_context.workspace_dir) / "merged.wav"
         )
-
-        # =====================================
-        # CONCAT
-        # =====================================
 
         await concat_wav_files(
             input_files=segment_files,
@@ -204,9 +153,8 @@ class AudioExecutor(
         )
 
         # =====================================
-        # READ MERGED
+        # 6. LƯU VÀO STORAGE
         # =====================================
-
         def read_file_bytes(p: str) -> bytes:
             with open(p, "rb") as f:
                 return f.read()
@@ -216,92 +164,41 @@ class AudioExecutor(
             merged_local_path,
         )
 
-        # =====================================
-        # UPLOAD
-        # =====================================
-
         await storage.write_bytes(
-
             runtime_context.narration_wav_path,
-
             merged_bytes,
         )
 
         # =====================================
-        # BUILD TIMELINE SEGMENTS
+        # 7. XÂY DỰNG TIMELINE SEGMENTS
         # =====================================
-
         result_segments = []
-
         current_time = 0.0
 
         for segment in segments:
-
-            segment_duration = round(
-                segment["duration"],
-                3,
-            )
-
-            start_time = round(
-                current_time,
-                3,
-            )
-
-            end_time = round(
-                current_time + segment_duration,
-                3,
-            )
+            segment_duration = round(segment["duration"], 3)
+            start_time = round(current_time, 3)
+            end_time = round(current_time + segment_duration, 3)
 
             result_segments.append({
-
-                "line_index":
-                    segment["line_index"],
-
-                "line_text":
-                    segment["line_text"],
-
-                "start_time":
-                    start_time,
-
-                "end_time":
-                    end_time,
-
-                "duration":
-                    segment_duration,
+                "line_index": segment["line_index"],
+                "line_text": segment["line_text"],
+                "start_time": start_time,
+                "end_time": end_time,
+                "duration": segment_duration,
             })
-
             current_time = end_time
 
-        # =====================================
-        # RESULT
-        # =====================================
-
-        duration = round(
-            current_time,
-            3,
-        )
-
-        elapsed = round(
-            time.time() - started_at,
-            3,
-        )
+        duration = round(current_time, 3)
+        elapsed = round(time.time() - started_at, 3)
 
         print(
-            "[AudioExecutor] "
-            f"Generated {len(segments)} segments "
-            f"duration={duration}s "
-            f"elapsed={elapsed}s"
+            f"[AudioExecutor] Generated {len(segments)} segments "
+            f"duration={duration}s elapsed={elapsed}s"
         )
 
         return {
-
-            "output_path":
-                runtime_context.narration_wav_path,
-
-            "duration":
-                duration,
-
-            "segments":
-                result_segments,
-
+            "output_path": runtime_context.narration_wav_path,
+            "duration": duration,
+            "segments": result_segments,
         }
