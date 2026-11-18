@@ -101,7 +101,14 @@ class BaseWorker(ABC):
         # ==================================
 
         self.running_tasks: set[str] = set()
+        self.task_lease_tracker: dict[str, float] = {}
         self.running_tasks_lock = asyncio.Lock()
+
+        self.task_lease_seconds = int(
+            getattr(settings.worker, "task_lease_seconds", 300)
+            or getattr(settings, "TASK_LEASE_SECONDS", 300)
+            or 300
+        )
 
         self.max_slots = getattr(settings.worker, "max_slots", 2)
         self.general_semaphore = (
@@ -125,6 +132,16 @@ class BaseWorker(ABC):
             0,
             self.max_slots - len(self.inflight_tasks)
         )
+
+    @property
+    def lease_renew_threshold(self) -> float:
+        """
+        Tính thời điểm cần gửi gia hạn lease:
+        Chỉ gửi khi task gần hết hạn (mặc định ở mốc 80% thời hạn, ví dụ 300s -> 240s,
+        dành 60s còn lại để bù trừ mạng hoặc retry).
+        """
+        buffer_seconds = min(60.0, max(15.0, self.task_lease_seconds * 0.2))
+        return max(10.0, self.task_lease_seconds - buffer_seconds)
 
     # ======================================
     # STORAGE
@@ -352,8 +369,10 @@ class BaseWorker(ABC):
 
             task = TaskDto.from_dict(task_data)
             tag = self._format_task_tag(task)
+            task_id_str = str(task.id)
             async with self.running_tasks_lock:
-                self.running_tasks.add(str(task.id))
+                self.running_tasks.add(task_id_str)
+                self.task_lease_tracker[task_id_str] = time.time()
 
             print(f"[BaseWorker] START {tag}")
 
@@ -453,8 +472,10 @@ class BaseWorker(ABC):
         finally:
 
             if task:
+                task_id_str = str(task.id)
                 async with self.running_tasks_lock:
-                    self.running_tasks.discard(str(task.id))
+                    self.running_tasks.discard(task_id_str)
+                    self.task_lease_tracker.pop(task_id_str, None)
 
             try:
                 if workspace_dir:
@@ -473,30 +494,42 @@ class BaseWorker(ABC):
     # ======================================
 
     async def lease_loop(self):
+        check_interval = 10  # Kiểm tra định kỳ mỗi 10s trong bộ nhớ (không gọi mạng nếu chưa đến hạn)
 
         while True:
 
             try:
+                now = time.time()
+                tasks_to_renew: list[str] = []
 
                 async with self.running_tasks_lock:
-                    task_ids = list(self.running_tasks)
+                    for task_id in list(self.running_tasks):
+                        last_renew = self.task_lease_tracker.get(task_id, now)
+                        if (now - last_renew) >= self.lease_renew_threshold:
+                            tasks_to_renew.append(task_id)
 
-                if task_ids:
+                if tasks_to_renew:
                     response = await self.api.renew_leases(
-
                         worker_id=self.worker_id,
-
-                        task_ids=task_ids,
+                        task_ids=tasks_to_renew,
                     )
 
+                    now_after_renew = time.time()
+                    async with self.running_tasks_lock:
+                        for task_id in tasks_to_renew:
+                            if task_id in self.running_tasks:
+                                self.task_lease_tracker[task_id] = now_after_renew
+
+                    short_ids = ", ".join(t[:8] for t in tasks_to_renew)
                     print(
                         "[BaseWorker] "
                         f"Lease renewed: "
                         f"{response.get('renewed', 0)}/"
-                        f"{response.get('requested', len(task_ids))}"
+                        f"{response.get('requested', len(tasks_to_renew))} "
+                        f"[{short_ids}] (lease: {self.task_lease_seconds}s, threshold: {self.lease_renew_threshold:.0f}s)"
                     )
 
-                await asyncio.sleep(10)
+                await asyncio.sleep(check_interval)
 
             except asyncio.CancelledError:
 

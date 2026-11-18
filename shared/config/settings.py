@@ -15,7 +15,7 @@ class MinioSettings(BaseModel):
 
 class WorkerSettings(BaseModel):
     poll_interval: int = 5
-    task_lease_seconds: int = 30
+    task_lease_seconds: int = 300
     max_slots: int = 2
     max_audio_slots: int = 2
     max_video_slots: int = 1
@@ -108,7 +108,7 @@ class Settings(BaseModel):
     WORKER_ID: str = "worker_pc_rtx3060"
     WORKER_TYPE: str = "gpu"
     WORKER_POLL_INTERVAL: int = 5
-    TASK_LEASE_SECONDS: int = 30
+    TASK_LEASE_SECONDS: int = 300
     FLARESOLVERR_URL: str = "http://192.168.1.147:8191/v1"
 
     @classmethod
@@ -147,7 +147,7 @@ class Settings(BaseModel):
         ))
         lease_seconds = int(os.getenv(
             "TASK_LEASE_SECONDS",
-            str(data.get("worker", {}).get("task_lease_seconds", 30))
+            str(data.get("worker", {}).get("task_lease_seconds", 300))
         ))
 
         data["API_BASE_URL"] = api_base
